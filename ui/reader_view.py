@@ -18,7 +18,7 @@ from typing import Any
 from ai.enrichment import enrich_if_empty
 from ai.ollama_client import OllamaClient
 from ai.personal_examples import generate_example
-from ingestion.json_builder import save_book_index
+from ingestion.json_builder import save_book_index, read_chapter_text
 from learning import mastery
 from learning.user_store import save_user_progress
 from models.schemas import BookIndex, ChapterInfo, UserProgress, WordKnowledge
@@ -71,6 +71,12 @@ class ReaderSession:
             out.append({"lemma": lemma, "status": status,
                         "color": _STATUS_COLORS.get(status, _STATUS_COLORS["new"])})
         return out
+
+    def chapter_text(self) -> str:
+        """Full prose of the current chapter (from the .txt sidecar)."""
+        if self.current_chapter is None:
+            return ""
+        return read_chapter_text(self.book.book_id, self.current_chapter)
 
     # ---------------------------------------------------------------- popups
 

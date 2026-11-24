@@ -16,6 +16,14 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+# ── Shared status‑colour mapping (single source of truth) ──────────────
+STATUS_COLORS = {
+    "new": "#c0392b",        # red – unknown
+    "learning": "#d68910",   # amber – learning
+    "mastered": "#1e8449",   # green – known
+    "skipped": "#5d6d7e",    # grey – skipped by user
+    "granted": "#95a5a6",    # dim – granted (should not appear post‑filter)
+}
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -132,6 +140,11 @@ class VocabularyEntry:
             linguistics=WordLinguistics.from_dict(data.get("linguistics", {})),
             semantic_keywords=list(data.get("semantic_keywords", [])),
         )
+
+    @property
+    def has_translations(self) -> bool:
+        """True if at least one *form* has at least one translation."""
+        return any(e.translations for e in self.entries)
 
 @dataclass
 class BookIndex:

@@ -6,21 +6,13 @@
 <title>DuoReado</title>
 <style>
   :root {
-    --bg: #0f1220;
-    --card: #1a1f36;
-    --card-hi: #232a47;
-    --text: #eef1fa;
-    --muted: #8b94b3;
-    --accent: #4ecca3;
-    --danger: #e94560;
-    --warn: #f7b731;
-    --border: #2b3355;
-    --radius: 14px;
+    --bg: #0f1220; --card: #1a1f36; --card-hi: #232a47;
+    --text: #eef1fa; --muted: #8b94b3; --accent: #4ecca3;
+    --danger: #e94560; --warn: #f7b731; --border: #2b3355; --radius: 14px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
-    margin: 0; padding: 0;
-    background: var(--bg); color: var(--text);
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     min-height: 100vh;
   }
@@ -37,69 +29,82 @@
   #status.online  { color: var(--accent); }
   #status.offline { color: var(--danger); }
 
+  #activity {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: var(--card-hi); z-index: 100;
+    padding: 8px 14px; font-size: 12px;
+    border-bottom: 1px solid var(--border);
+    display: none;
+  }
+  #activity.visible { display: block; }
+  #activity .row { display: flex; align-items: center; gap: 8px; margin: 0; }
+  #activity .label { flex: 1; white-space: nowrap; overflow: hidden;
+                     text-overflow: ellipsis; }
+  #activity .eta { color: var(--muted); font-variant-numeric: tabular-nums; }
+  #activity .progress { height: 4px; background: var(--bg); border-radius: 2px;
+                        overflow: hidden; margin-top: 6px; }
+  #activity .progress > span { display: block; height: 100%; background: var(--accent);
+                               transition: width .15s linear; }
+
   nav {
-    display: flex; gap: 4px; padding: 8px 12px;
+    display: flex; gap: 2px; padding: 8px 8px;
     border-bottom: 1px solid var(--border);
     position: sticky; top: 57px; background: var(--bg); z-index: 4;
+    overflow-x: auto;
   }
   nav button {
-    flex: 1; padding: 10px; border-radius: 10px;
+    flex: 1; min-width: 60px; padding: 10px 6px; border-radius: 10px;
     background: transparent; color: var(--muted);
-    border: 1px solid transparent; font-size: 14px; font-weight: 500;
-    cursor: pointer;
+    border: 1px solid transparent; font-size: 13px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
   }
   nav button.active {
     background: var(--card); color: var(--text);
     border-color: var(--border);
   }
 
-  main { padding: 16px; max-width: 640px; margin: 0 auto; }
+  main { padding: 16px; max-width: 720px; margin: 0 auto; }
   .view { display: none; }
   .view.active { display: block; }
 
   .card {
     background: var(--card); border-radius: var(--radius);
-    padding: 16px; margin-bottom: 12px;
-    border: 1px solid var(--border);
+    padding: 16px; margin-bottom: 12px; border: 1px solid var(--border);
   }
-
   h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted);
        text-transform: uppercase; letter-spacing: .8px; font-weight: 600; }
 
   label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 6px; }
-  select, input {
+  select, input[type="text"], input[type="number"], input[type="search"], textarea {
     width: 100%; padding: 12px; font-size: 16px;
     background: var(--card-hi); color: var(--text);
     border: 1px solid var(--border); border-radius: 10px;
-    appearance: none;
+    appearance: none; font-family: inherit;
   }
+  textarea { resize: vertical; font-family: "SF Mono", Consolas, monospace;
+             font-size: 12px; line-height: 1.4; }
 
-  button.primary, button.ghost, button.danger {
-    width: 100%; padding: 14px; font-size: 16px;
-    border-radius: 12px; border: none; font-weight: 600;
-    cursor: pointer; margin-top: 10px;
+  button.primary, button.ghost, button.danger, button.tiny {
+    padding: 14px; font-size: 16px; border-radius: 12px; border: none;
+    font-weight: 600; cursor: pointer;
   }
   button.primary { background: var(--accent); color: #051b15; }
   button.danger  { background: var(--danger); color: #fff; }
   button.ghost   { background: var(--card-hi); color: var(--text);
                    border: 1px solid var(--border); }
+  button.tiny    { padding: 6px 10px; font-size: 12px; }
+  button.block   { width: 100%; margin-top: 10px; }
   button:disabled { opacity: .45; cursor: default; }
 
   .row { display: flex; gap: 8px; margin-top: 10px; }
   .row > button { margin-top: 0; flex: 1; }
 
-  /* --- Practice card --- */
-  .word {
-    font-size: 34px; font-weight: 700; text-align: center;
-    margin: 8px 0 4px; word-break: break-word;
-  }
+  .word { font-size: 34px; font-weight: 700; text-align: center;
+          margin: 8px 0 4px; word-break: break-word; }
   .word-meta { text-align: center; color: var(--muted); font-size: 13px; }
-  .bar {
-    height: 6px; background: var(--card-hi); border-radius: 3px;
-    overflow: hidden; margin-top: 10px;
-  }
+  .bar { height: 6px; background: var(--card-hi); border-radius: 3px;
+         overflow: hidden; margin-top: 10px; }
   .bar > span { display: block; height: 100%; background: var(--accent); }
-
   .reveal { margin-top: 16px; }
   .reveal.hidden { display: none; }
 
@@ -113,32 +118,19 @@
   .edge-cases { margin: 8px 0 0; padding-left: 18px; color: var(--muted);
                 font-size: 14px; line-height: 1.5; }
   .edge-cases li { margin-bottom: 4px; }
-
   .relation { color: var(--muted); font-size: 12px; }
-  .form-row {
-    display: flex; justify-content: space-between;
-    align-items: baseline; gap: 8px;
-    padding: 6px 0; border-bottom: 1px solid var(--border);
-  }
+  .form-row { display: flex; justify-content: space-between; align-items: baseline;
+              gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
   .form-row:last-child { border-bottom: none; }
-
-  .example {
-    background: var(--card-hi); border-radius: 10px; padding: 10px 12px;
-    margin-top: 8px; font-size: 14px; line-height: 1.5;
-  }
+  .example { background: var(--card-hi); border-radius: 10px; padding: 10px 12px;
+             margin-top: 8px; font-size: 14px; line-height: 1.5; }
   .example .tr { color: var(--muted); margin-top: 4px; font-style: italic; }
+  .feedback { text-align: center; color: var(--muted); font-size: 13px;
+              margin-top: 12px; min-height: 18px; }
 
-  .feedback {
-    text-align: center; color: var(--muted); font-size: 13px;
-    margin-top: 12px; min-height: 18px;
-  }
-
-  /* --- Progress --- */
   .chapter-row { margin-bottom: 14px; }
-  .chapter-head {
-    display: flex; justify-content: space-between;
-    align-items: baseline; margin-bottom: 6px;
-  }
+  .chapter-head { display: flex; justify-content: space-between;
+                  align-items: baseline; margin-bottom: 6px; }
   .chapter-head .title { font-size: 14px; }
   .chapter-head .score { font-size: 12px; color: var(--muted); }
   .readiness-bar { height: 8px; background: var(--card-hi);
@@ -152,15 +144,61 @@
   .empty { text-align: center; color: var(--muted); padding: 30px 10px;
            font-size: 15px; line-height: 1.6; }
 
-  .pill {
-    display: inline-block; padding: 2px 8px; font-size: 11px;
-    border-radius: 999px; background: var(--card-hi); color: var(--muted);
-    border: 1px solid var(--border);
-  }
+  .pill { display: inline-block; padding: 2px 8px; font-size: 11px;
+          border-radius: 999px; background: var(--card-hi); color: var(--muted);
+          border: 1px solid var(--border); }
   .pill.learning { color: var(--warn); border-color: var(--warn); }
   .pill.mastered { color: var(--accent); border-color: var(--accent); }
   .pill.new      { color: var(--muted); }
   .pill.skipped  { color: #7a7f93; }
+
+  /* Word list */
+  .word-row { display: flex; justify-content: space-between; align-items: center;
+              padding: 10px 12px; border-bottom: 1px solid var(--border);
+              cursor: pointer; }
+  .word-row:hover { background: var(--card-hi); }
+  .word-row .wl { font-weight: 600; font-size: 15px; }
+  .word-row .wt { font-size: 12px; color: var(--muted); }
+  .word-row .wr { text-align: right; }
+
+  /* Log panel */
+  #log-panel {
+    background: #0b0e19; border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 10px; font-family: "SF Mono", Consolas, monospace;
+    font-size: 11px; max-height: 180px; overflow-y: auto;
+    color: #a8b3d1; line-height: 1.5; margin-top: 12px;
+  }
+  #log-panel .ts { color: #5c6b8a; }
+
+  /* Modal */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.65); z-index: 200;
+    align-items: flex-start; justify-content: center;
+    padding: 20px; overflow-y: auto;
+  }
+  .modal-backdrop.visible { display: flex; }
+  .modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); max-width: 720px; width: 100%;
+    margin-top: 40px;
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center;
+                  padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .modal-header span { font-weight: 600; }
+  .modal-body { padding: 16px; max-height: 65vh; overflow-y: auto; }
+  .modal-footer { padding: 12px 16px; border-top: 1px solid var(--border);
+                  display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  .modal-footer button { padding: 10px 16px; font-size: 14px; width: auto; }
+
+  .chapter-edit-row {
+    display: grid; grid-template-columns: 1fr 80px 80px 40px;
+    gap: 6px; margin-bottom: 8px; align-items: center;
+  }
+  .chapter-edit-row input { padding: 8px; font-size: 14px; }
+  .chapter-edit-row .rm { padding: 6px 8px; font-size: 12px; }
+  .chapter-edit-head { font-size: 11px; color: var(--muted);
+                       text-transform: uppercase; letter-spacing: .5px; }
 </style>
 </head>
 <body>
@@ -170,8 +208,17 @@
   <span id="status">connecting…</span>
 </header>
 
+<div id="activity">
+  <div class="row">
+    <span class="label" id="act-label">Working…</span>
+    <span class="eta" id="act-eta"></span>
+  </div>
+  <div class="progress"><span id="act-bar" style="width:0%"></span></div>
+</div>
+
 <nav>
   <button data-view="practice" class="active">Practice</button>
+  <button data-view="words">Words</button>
   <button data-view="progress">Progress</button>
   <button data-view="setup">Setup</button>
   <button data-view="library">Library</button>
@@ -179,19 +226,16 @@
 
 <main>
 
-  <!-- ============================= PRACTICE ============================= -->
+  <!-- ========================== PRACTICE ========================== -->
   <section id="view-practice" class="view active">
     <div id="practice-empty" class="card empty">
       Pick a book and chapter in <b>Setup</b> to start practising.
     </div>
-
     <div id="practice-card" class="card" style="display:none">
       <div class="word" id="p-word">—</div>
       <div class="word-meta" id="p-meta"></div>
       <div class="bar"><span id="p-bar" style="width:0%"></span></div>
-
       <div id="p-reveal" class="reveal hidden"></div>
-
       <div class="row">
         <button id="p-reveal-btn" class="ghost">Reveal</button>
       </div>
@@ -201,12 +245,11 @@
       </div>
       <div class="row">
         <button id="p-skip"   class="ghost">Skip word</button>
-        <button id="p-enrich" class="ghost">Enrich with AI</button>
+        <button id="p-known"  class="ghost">Mark known</button>
+        <button id="p-enrich" class="ghost">Enrich</button>
       </div>
-
       <div class="feedback" id="p-feedback"></div>
     </div>
-
     <div id="practice-done" class="card empty" style="display:none">
       <div style="font-size:32px">🎉</div>
       Session complete. Nice work!<br>
@@ -216,7 +259,30 @@
     </div>
   </section>
 
-  <!-- ============================= PROGRESS ============================= -->
+  <!-- ============================ WORDS =========================== -->
+  <section id="view-words" class="view">
+    <div class="card">
+      <h2>Browse words</h2>
+      <label for="w-book">Book</label>
+      <select id="w-book"></select>
+      <label for="w-chapter">Chapter (optional)</label>
+      <select id="w-chapter"><option value="">All chapters</option></select>
+      <label for="w-search">Search lemma</label>
+      <input id="w-search" type="search" placeholder="e.g. soledad">
+      <button id="w-load" class="primary block">Load</button>
+    </div>
+    <div class="card" id="w-results" style="display:none">
+      <div id="w-count" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
+      <div id="w-list"></div>
+      <div class="row" id="w-pager">
+        <button id="w-prev" class="ghost">← Prev</button>
+        <button id="w-next" class="ghost">Next →</button>
+      </div>
+    </div>
+    <div id="w-detail" class="card" style="display:none"></div>
+  </section>
+
+  <!-- =========================== PROGRESS ========================= -->
   <section id="view-progress" class="view">
     <div id="progress-empty" class="card empty">
       Load a book to see per-chapter progress.
@@ -224,63 +290,116 @@
     <div id="progress-list"></div>
   </section>
 
-  <!-- ============================== LIBRARY ============================= -->
-  <section id="view-library" class="view">
-    <div class="card">
-      <h2>PDF folder</h2>
-      <p style="color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 12px">
-        Drop PDFs into <code>data/pdfs/</code> on the PC, or upload from this device.
-        Name them <code>title_es.pdf</code> (or add a <code>.pdf.meta.json</code>
-        sidecar) so the language is detected.
-      </p>
-
-      <input type="file" id="lib-file" accept="application/pdf" style="display:none">
-      <button id="lib-upload" class="ghost">Upload a PDF from this device</button>
-      <button id="lib-scan" class="primary">Scan folder &amp; ingest all</button>
-
-      <div id="lib-list" style="margin-top:14px"></div>
-      <div class="feedback" id="lib-feedback"></div>
-    </div>
-  </section>
-
-  <!-- ============================== SETUP =============================== -->
+  <!-- ============================ SETUP =========================== -->
   <section id="view-setup" class="view">
     <div class="card">
       <h2>Book</h2>
       <label for="s-book">Choose a book</label>
       <select id="s-book"></select>
-
       <label for="s-chapter">Chapter number</label>
       <input id="s-chapter" type="number" min="1" value="1">
-
       <label for="s-limit">Words in session</label>
       <input id="s-limit" type="number" min="1" max="100" value="20">
-
-      <button id="s-start" class="primary" disabled>Load &amp; start</button>
+      <button id="s-start" class="primary block" disabled>Load &amp; start</button>
       <div class="feedback" id="s-feedback"></div>
+    </div>
+  </section>
+
+  <!-- =========================== LIBRARY ========================== -->
+  <section id="view-library" class="view">
+
+    <div class="card">
+      <h2>PDF folder</h2>
+      <p style="color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 12px">
+        Drop PDFs into <code>data/pdfs/</code>, or upload from this device.
+      </p>
+      <input type="file" id="lib-file" accept="application/pdf" style="display:none">
+      <button id="lib-upload" class="ghost block">Upload a PDF from this device</button>
+      <button id="lib-scan" class="primary block">Scan folder &amp; ingest all</button>
+      <div id="lib-list" style="margin-top:14px"></div>
+      <div class="feedback" id="lib-feedback"></div>
+    </div>
+
+    <div class="card">
+      <h2>Edit JSON</h2>
+      <p style="color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 12px">
+        Directly edit the raw JSON of a book, or of your own progress file.
+        Files are validated before being written — an invalid edit is rejected
+        without touching the existing file.
+      </p>
+      <label for="raw-book">Book JSON</label>
+      <select id="raw-book"></select>
+      <div class="row">
+        <button id="raw-book-edit"    class="ghost">Edit</button>
+        <button id="raw-book-download" class="ghost">Download</button>
+      </div>
+      <button id="raw-user-edit" class="ghost block">
+        Edit user progress JSON
+      </button>
+      <div class="feedback" id="raw-feedback"></div>
+    </div>
+
+    <div class="card">
+      <h2>Browse words</h2>
+      <label for="w-book">Book</label>
+      <select id="w-book"></select>
+      <label for="w-chapter">Chapter</label>
+      <select id="w-chapter"><option value="">All chapters</option></select>
+      <label for="w-search">Search lemma</label>
+      <input id="w-search" type="search" placeholder="e.g. soledad">
+
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <div style="flex:1">
+          <label for="w-sort">Sort by</label>
+          <select id="w-sort">
+            <option value="alpha">A → Z</option>
+            <option value="freq">Frequency (high→low)</option>
+            <option value="keyword">Semantic keyword</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label for="w-keyword">Filter keyword</label>
+          <select id="w-keyword"><option value="">All keywords</option></select>
+        </div>
+      </div>
+
+      <button id="w-load" class="primary block">Load</button>
+    </div>
+
+    <div class="card">
+      <h2>Live log</h2>
+      <div id="log-panel" aria-live="polite"></div>
     </div>
   </section>
 
 </main>
 
+<!-- ============================== MODAL ============================= -->
+<div id="modal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modal-title">Title</span>
+      <button id="modal-close" class="ghost tiny" style="width:auto">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
 <script>
 (() => {
-  // ---------------------------------------------------------------- state
+  // ── state ────────────────────────────────────────────────────────
   const state = {
-    books: [],
-    book: null,        // {book_id, title, language}
-    chapter: null,     // {number, title, total_words}
-    user: null,
-    queue: [],         // remaining lemmas
-    queueSize: 0,
-    current: null,     // current item payload from /api/session/next
-    revealed: false,
+    books: [], book: null, chapter: null, user: null,
+    queue: [], queueSize: 0, current: null, revealed: false,
     sessionActive: false,
+    // words tab
+    wordBookId: null, wordChapter: null, wordQuery: "",
+    wordOffset: 0, wordLimit: 100, wordTotal: 0, wordItems: [],
   };
-
   const $ = (id) => document.getElementById(id);
 
-  // ------------------------------------------------------------- transport
+  // ── transport ────────────────────────────────────────────────────
   async function apiGet(path) {
     const res = await fetch(path, { cache: "no-store" });
     const data = await res.json().catch(() => ({}));
@@ -297,25 +416,107 @@
     if (!res.ok || data.ok === false) throw new Error(data.error || res.statusText);
     return data;
   }
-
   function setStatus(text, cls) {
-    const el = $("status");
-    el.textContent = text;
-    el.className = cls || "";
+    const el = $("status"); el.textContent = text; el.className = cls || "";
+  }
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  // -------------------------------------------------------------- nav/tabs
+  // ── live activity bar ───────────────────────────────────────────
+  let pollHandle = null, lastTaskActive = false;
+  function renderTask(task) {
+    const el = $("activity"), bar = $("act-bar"),
+          label = $("act-label"), eta = $("act-eta");
+    if (!task || !task.active) {
+      el.classList.remove("visible");
+      if (lastTaskActive) {
+        lastTaskActive = false;
+        loadPdfs().catch(() => {});
+        loadBooks().catch(() => {});
+        loadRawBookList().catch(() => {});
+      }
+      return;
+    }
+    lastTaskActive = true;
+    el.classList.add("visible");
+    label.textContent = task.label
+      ? `${task.label} — ${task.stage || ""}`
+      : (task.stage || "Working…");
+    const pct = task.total > 0 ? Math.min(100, (task.current / task.total) * 100) : 0;
+    bar.style.width = `${pct.toFixed(1)}%`;
+    eta.textContent = task.eta_seconds != null
+      ? `~${Math.ceil(task.eta_seconds)}s left` : "";
+  }
+  async function pollTask() {
+    try { renderTask((await apiGet("/api/progress/live")).task); } catch {}
+  }
+  function startPolling() { if (!pollHandle) pollHandle = setInterval(pollTask, 700); }
+
+  // ── live log ────────────────────────────────────────────────────
+  let lastLogLength = 0;
+  async function pollLog() {
+    try {
+      const data = await apiGet("/api/log?n=40");
+      const lines = data.lines || [];
+      if (lines.length === lastLogLength) return;
+      lastLogLength = lines.length;
+      $("log-panel").innerHTML = lines.map((line) => {
+        const i = line.indexOf("] ");
+        const ts = i >= 0 ? line.slice(0, i + 1) : "";
+        const msg = i >= 0 ? line.slice(i + 2) : line;
+        return `<div><span class="ts">${escapeHtml(ts)}</span> ${escapeHtml(msg)}</div>`;
+      }).join("");
+      $("log-panel").scrollTop = $("log-panel").scrollHeight;
+    } catch {}
+  }
+
+  // ── modal ───────────────────────────────────────────────────────
+  function openModal(title, bodyHtml, footerButtons) {
+    $("modal-title").textContent = title;
+    $("modal-body").innerHTML = bodyHtml;
+    const footer = $("modal-footer");
+    footer.innerHTML = "";
+    (footerButtons || []).forEach((b) => {
+      const btn = document.createElement("button");
+      btn.className = b.primary ? "primary" : "ghost";
+      btn.textContent = b.label;
+      btn.addEventListener("click", b.onClick);
+      footer.appendChild(btn);
+    });
+    $("modal").classList.add("visible");
+  }
+  function closeModal() {
+    $("modal").classList.remove("visible");
+    $("modal-body").innerHTML = "";
+    $("modal-footer").innerHTML = "";
+  }
+  $("modal-close").addEventListener("click", closeModal);
+  $("modal").addEventListener("click", (e) => {
+    if (e.target === $("modal")) closeModal();
+  });
+
+  // ── tabs ────────────────────────────────────────────────────────
   document.querySelectorAll("nav button").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll("nav button").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+      document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
       btn.classList.add("active");
       $(`view-${btn.dataset.view}`).classList.add("active");
       if (btn.dataset.view === "progress") loadProgress();
+      if (btn.dataset.view === "words") {
+        populateWordBooks().catch(() => {});
+      }
+      if (btn.dataset.view === "library") {
+        loadPdfs().catch(() => {});
+        loadRawBookList().catch(() => {});
+      }
     });
   });
-    
-  // inside the IIFE, after the existing tab wiring
+
+  // ── library: pdf list / upload / scan ────────────────────────────
   async function loadPdfs() {
     try {
       const data = await apiGet("/api/pdfs");
@@ -324,43 +525,52 @@
         list.innerHTML = '<div class="empty">No PDFs in data/pdfs/ yet.</div>';
         return;
       }
-      list.innerHTML = data.pdfs.map(p => `
+      list.innerHTML = data.pdfs.map((p) => `
         <div class="card" style="padding:12px;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
-            <div>
-              <div style="font-weight:600">${escapeHtml(p.name)}</div>
+            <div style="min-width:0">
+              <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis">
+                ${escapeHtml(p.name)}
+              </div>
               <div style="font-size:12px;color:var(--muted)">
                 ${p.size_kb} KB · ${escapeHtml(p.language)}
                 ${p.ingested ? '· <span style="color:var(--accent)">ingested</span>' : ''}
+                ${p.has_chapters ? '· <span style="color:var(--warn)">custom chapters</span>' : ''}
               </div>
             </div>
-            <button class="ghost" style="width:auto;padding:8px 12px"
-                    data-ingest="${escapeHtml(p.name)}">
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="ghost tiny" data-ingest="${escapeHtml(p.name)}">
               ${p.ingested ? "Rebuild" : "Ingest"}
+            </button>
+            <button class="ghost tiny" data-chapters="${escapeHtml(p.name)}">
+              Edit chapters
             </button>
           </div>
         </div>`).join("");
-
       list.querySelectorAll("button[data-ingest]").forEach(btn => {
         btn.addEventListener("click", () => ingestOne(btn.dataset.ingest, true));
+      });
+      list.querySelectorAll("button[data-chapters]").forEach(btn => {
+        btn.addEventListener("click", () => openChapterEditor(btn.dataset.chapters));
       });
     } catch (err) {
       $("lib-feedback").textContent = `Error: ${err.message}`;
     }
   }
-
   async function ingestOne(name, force) {
     $("lib-feedback").textContent = `Ingesting ${name}…`;
     try {
       const res = await apiPost("/api/ingest", { filename: name, force });
-      $("lib-feedback").textContent = `Done: ${res.result.book_id} — ${res.result.words} words.`;
+      $("lib-feedback").textContent =
+        `Done: ${res.result.book_id} — ${res.result.words} words, ${res.result.chapters} chapters.`;
       await loadPdfs();
-      await loadBooks();          // refresh the Setup dropdown
+      await loadBooks();
+      await loadRawBookList();
     } catch (err) {
       $("lib-feedback").textContent = `Error: ${err.message}`;
     }
   }
-
   async function ingestAll() {
     $("lib-feedback").textContent = "Scanning data/pdfs/…";
     try {
@@ -369,11 +579,11 @@
       $("lib-feedback").textContent = `Ingested ${ok}/${res.result.length} PDFs.`;
       await loadPdfs();
       await loadBooks();
+      await loadRawBookList();
     } catch (err) {
       $("lib-feedback").textContent = `Error: ${err.message}`;
     }
   }
-
   $("lib-scan").addEventListener("click", ingestAll);
   $("lib-upload").addEventListener("click", () => $("lib-file").click());
   $("lib-file").addEventListener("change", async (e) => {
@@ -397,7 +607,330 @@
     }
   });
 
-  // --------------------------------------------------------- setup: books
+  // ── chapter editor modal ────────────────────────────────────────
+  async function openChapterEditor(filename) {
+    try {
+      const info = await apiGet(`/api/pdf/pages?name=${encodeURIComponent(filename)}`);
+      const chapters = info.current_chapters && info.current_chapters.length
+        ? info.current_chapters
+        : [{ title: "Full Text", start_page: 1, end_page: info.total_pages }];
+
+      openModal(
+        `Chapters — ${filename} (${info.total_pages} pages)`,
+        `<p style="color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 12px">
+           Set the page range of each chapter. Leave <code>end</code> empty to mean
+           "until the next chapter, or end of book". Ranges must be monotonic.
+         </p>
+         <div class="chapter-edit-head">
+           <span>Title</span><span>Start pg</span><span>End pg</span><span></span>
+         </div>
+         <div id="chapter-edit-rows"></div>
+         <button id="chapter-add" class="ghost tiny" style="margin-top:10px">
+           + Add chapter
+         </button>`,
+        [
+          { label: "Cancel", onClick: closeModal },
+          { label: "Save only", onClick: () => saveChapterSpecs(filename, false) },
+          { label: "Save & re-ingest", primary: true,
+            onClick: () => saveChapterSpecs(filename, true) },
+        ],
+      );
+
+      const rows = $("chapter-edit-rows");
+      const addRow = (ch) => {
+        const div = document.createElement("div");
+        div.className = "chapter-edit-row";
+        div.innerHTML = `
+          <input type="text"   class="ch-title" value="${escapeHtml(ch.title || "")}">
+          <input type="number" class="ch-start" value="${ch.start_page || 1}" min="1" max="${info.total_pages}">
+          <input type="number" class="ch-end"   value="${ch.end_page || ""}" min="1" max="${info.total_pages}" placeholder="auto">
+          <button class="ghost tiny rm" type="button">✕</button>`;
+        div.querySelector(".rm").addEventListener("click", () => div.remove());
+        rows.appendChild(div);
+      };
+      chapters.forEach(addRow);
+      $("chapter-add").addEventListener("click", () =>
+        addRow({ title: `Chapter ${rows.children.length + 1}`, start_page: 1, end_page: "" })
+      );
+
+      // Rebind Save buttons so they can read the live rows.
+      const save = (doReingest) => async () => {
+        const chapters = Array.from(rows.children).map((div) => ({
+          title: div.querySelector(".ch-title").value.trim(),
+          start_page: parseInt(div.querySelector(".ch-start").value, 10) || 1,
+          end_page: parseInt(div.querySelector(".ch-end").value, 10) || 0,
+        })).filter(c => c.title);
+        if (chapters.length === 0) {
+          alert("Add at least one chapter."); return;
+        }
+        try {
+          await apiPost(`/api/pdf/chapters?name=${encodeURIComponent(filename)}`,
+                        { chapters });
+          if (doReingest) {
+            closeModal();
+            await ingestOne(filename, true);
+          } else {
+            alert(`Saved ${chapters.length} chapters. Click "Rebuild" to apply.`);
+          }
+        } catch (err) {
+          alert(`Save failed: ${err.message}`);
+        }
+      };
+      const footerBtns = $("modal-footer").querySelectorAll("button");
+      footerBtns[1].onclick = save(false);
+      footerBtns[2].onclick = save(true);
+    } catch (err) {
+      alert(`Could not open chapter editor: ${err.message}`);
+    }
+  }
+
+  // ── raw JSON editor ─────────────────────────────────────────────
+  async function loadRawBookList() {
+    try {
+      const data = await apiGet("/api/books");
+      const sel = $("raw-book");
+      sel.innerHTML = "";
+      (data.books || []).forEach((id) => {
+        const opt = document.createElement("option");
+        opt.value = id; opt.textContent = id;
+        sel.appendChild(opt);
+      });
+    } catch {}
+  }
+  async function openJsonEditor(kind, id) {
+    try {
+      const data = await apiGet(`/api/raw/${kind}/${encodeURIComponent(id)}`);
+      const text = data.text;
+      const sizeKb = Math.round(new Blob([text]).size / 1024);
+      openModal(
+        `Edit ${kind} JSON — ${id} (${sizeKb} KB)`,
+        `<p style="color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 8px">
+           The file is validated before writing. If validation fails, the existing
+           file is untouched. ${sizeKb > 500 ? "<br><b>Large file</b> — consider downloading and editing locally." : ""}
+         </p>
+         <textarea id="json-text" style="min-height:50vh">${escapeHtml(text)}</textarea>`,
+        [
+          { label: "Close", onClick: closeModal },
+          { label: "Save", primary: true, onClick: async () => {
+              const newText = $("json-text").value;
+              try {
+                await apiPost(`/api/raw/${kind}/${encodeURIComponent(id)}`, { text: newText });
+                $("raw-feedback").textContent = `Saved ${kind}/${id}`;
+                closeModal();
+              } catch (err) {
+                alert(`Save failed: ${err.message}`);
+              }
+            } },
+        ],
+      );
+    } catch (err) {
+      alert(`Could not open JSON editor: ${err.message}`);
+    }
+  }
+  $("raw-book-edit").addEventListener("click", () => {
+    const id = $("raw-book").value;
+    if (id) openJsonEditor("book", id);
+  });
+  $("raw-book-download").addEventListener("click", () => {
+    const id = $("raw-book").value;
+    if (!id) return;
+    window.open(`/api/raw/book/${encodeURIComponent(id)}/download`, "_blank");
+  });
+  $("raw-user-edit").addEventListener("click", async () => {
+    try {
+      const st = await apiGet("/api/state");
+      const uid = st.state?.user?.user_id || "default";
+      await openJsonEditor("user", uid);
+    } catch (err) {
+      alert(`Could not determine user id: ${err.message}`);
+    }
+  });
+
+  // ── Words tab ──────────────────────────────────────────────────
+  async function populateWordBooks() {
+    const data = await apiGet("/api/books");
+
+    const sel = $("w-book");
+    sel.innerHTML = "";
+    (data.books || []).forEach((id) => {
+      const opt = document.createElement("option");
+      opt.value = id; opt.textContent = id;
+      sel.appendChild(opt);
+    });
+
+    if (data.books?.length) {
+      await populateWordChapters(data.books[0]);
+      await populateWordKeywords(data.books[0]);   // ← ADD THIS LINE
+    }
+  }
+
+  async function populateWordChapters(bookId) {
+    const sel = $("w-chapter");
+    sel.innerHTML = '<option value="">All chapters</option>';
+    try {
+      const data = await apiGet(`/api/book/${encodeURIComponent(bookId)}`);
+      (data.chapters || []).forEach((ch) => {
+        const opt = document.createElement("option");
+        opt.value = String(ch.number);
+        opt.textContent = `Ch. ${ch.number} — ${ch.title || ""} (pp. ${ch.start_page}–${ch.end_page})`;
+        sel.appendChild(opt);
+      });
+    } catch {}
+  }
+  $("w-book").addEventListener("change", (e) => populateWordChapters(e.target.value));
+  $("w-search").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { loadWords(0); }
+  });
+  $("w-load").addEventListener("click", () => loadWords(0));
+  $("w-prev").addEventListener("click", () => loadWords(Math.max(0, state.wordOffset - state.wordLimit)));
+  $("w-next").addEventListener("click", () => loadWords(state.wordOffset + state.wordLimit));
+
+  async function loadWords(offset) {
+    const bookId = $("w-book").value;
+    if (!bookId) return;
+    const ch = $("w-chapter").value;
+    const q = $("w-search").value.trim();
+    const sort = $("w-sort").value;
+    const keyword = $("w-keyword").value;
+    const params = new URLSearchParams({
+      book_id: bookId, q, sort, keyword,
+      limit: String(state.wordLimit), offset: String(offset),
+    });
+    if (ch) params.set("chapter", ch);
+    try {
+      const data = await apiGet(`/api/words?${params}`);
+      state.wordItems = data.words || [];
+      state.wordTotal = data.total || 0;
+      state.wordOffset = offset;
+      state.wordChapter = data.chapter_number;
+      state.wordBookId = bookId;
+
+      $("w-results").style.display = "block";
+      $("w-detail").style.display = "none";
+
+      const from = data.total ? offset + 1 : 0;
+      const to = Math.min(offset + state.wordLimit, data.total);
+      const parts = [`${from}–${to} of ${data.total}`];
+      if (data.chapter_number) parts.push(`Ch. ${data.chapter_number}`);
+      if (q) parts.push(`"${q}"`);
+      if (keyword) parts.push(`#${keyword}`);
+      if (sort !== "alpha") parts.push(`sort=${sort}`);
+      $("w-count").textContent = parts.join(" · ");
+
+      const list = $("w-list");
+      if (!data.words.length) {
+        list.innerHTML = '<div class="empty">No words match.</div>';
+      } else {
+        list.innerHTML = data.words.map((w) => `
+          <div class="word-row" data-lemma="${escapeHtml(w.lemma)}">
+            <div style="min-width:0;flex:1">
+              <div class="wl">${escapeHtml(w.lemma)}</div>
+              <div class="wt">${w.translation ? escapeHtml(w.translation) : "—"}
+                · ${w.occurrences}× · ch.${w.first_chapter || "?"}</div>
+              ${(w.keywords||[]).length
+                ? `<div style="margin-top:4px">${
+                    w.keywords.slice(0,4).map(k =>
+                      `<span class="pill" style="margin-right:4px">#${escapeHtml(k)}</span>`
+                    ).join("")
+                  }</div>`
+                : ""}
+            </div>
+            <div class="wr">
+              <span class="pill ${w.status}">${escapeHtml(w.status)}</span>
+              ${w.is_enriched ? "" : '<span class="pill">raw</span>'}
+            </div>
+          </div>`).join("");
+        list.querySelectorAll(".word-row").forEach(row => {
+          row.addEventListener("click", () => openWordDetail(row.dataset.lemma));
+        });
+      }
+      $("w-prev").disabled = offset === 0;
+      $("w-next").disabled = offset + state.wordLimit >= data.total;
+    } catch (err) {
+      $("w-count").textContent = `Error: ${err.message}`;
+    }
+  }
+
+  async function populateWordKeywords(bookId) {
+    const sel = $("w-keyword");
+    sel.innerHTML = '<option value="">All keywords</option>';
+    if (!bookId) return;
+    try {
+      const data = await apiGet(`/api/keywords?book_id=${encodeURIComponent(bookId)}`);
+      (data.keywords || []).forEach(({ keyword, count }) => {
+        const opt = document.createElement("option");
+        opt.value = keyword;
+        opt.textContent = `#${keyword} (${count})`;
+        sel.appendChild(opt);
+      });
+    } catch {}
+  }
+
+  async function openWordDetail(lemma) {
+    try {
+      const data = await apiGet(`/api/word/${encodeURIComponent(lemma)}`);
+      const w = data.word;
+      const html = buildRevealHtml(w);
+      const wk = w.knowledge || {};
+      const wrap = $("w-detail");
+      wrap.style.display = "block";
+      wrap.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <div class="word" style="font-size:26px;margin:0">${escapeHtml(lemma)}</div>
+          <span class="pill ${wk.known_status || 'new'}">${escapeHtml(wk.known_status || "new")}</span>
+        </div>
+        <div style="margin:8px 0">${html}</div>
+        <div class="row">
+          <button id="wd-skip"  class="ghost">Skip</button>
+          <button id="wd-known" class="ghost">Mark known</button>
+          <button id="wd-enrich" class="ghost" ${w.is_enriched ? "disabled" : ""}>
+            ${w.is_enriched ? "Enriched" : "Enrich with AI"}
+          </button>
+        </div>`;
+
+      // Keyword chips — click to filter
+      const kws = (w.entry?.semantic_keywords) || [];
+      if (kws.length) {
+        const chipRow = document.createElement("div");
+        chipRow.className = "translations";
+        chipRow.style.marginTop = "10px";
+        chipRow.innerHTML = kws.map(k =>
+          `<span style="cursor:pointer" data-kw="${escapeHtml(k)}">#${escapeHtml(k)}</span>`
+        ).join("");
+        wrap.querySelector("div[style*='margin:8px 0']").appendChild(chipRow);
+        chipRow.querySelectorAll("[data-kw]").forEach(chip => {
+          chip.addEventListener("click", () => {
+            $("w-keyword").value = chip.dataset.kw;
+            loadWords(0);
+          });
+        });
+      }
+
+      $("wd-skip").addEventListener("click", async () => {
+        await apiPost(`/api/word/${encodeURIComponent(lemma)}/skip`, {});
+        openWordDetail(lemma);
+      });
+      $("wd-known").addEventListener("click", async () => {
+        await apiPost(`/api/word/${encodeURIComponent(lemma)}/known`, {});
+        openWordDetail(lemma);
+      });
+      $("wd-enrich").addEventListener("click", async () => {
+        $("wd-enrich").disabled = true; $("wd-enrich").textContent = "Enriching…";
+        try {
+          await apiPost(`/api/word/${encodeURIComponent(lemma)}/enrich`, {});
+          openWordDetail(lemma);
+        } catch {
+          $("wd-enrich").textContent = "Retry";
+          $("wd-enrich").disabled = false;
+        }
+      });
+      wrap.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      alert(`Error loading word: ${err.message}`);
+    }
+  }
+
+  // ── Setup ──────────────────────────────────────────────────────
   async function loadBooks() {
     try {
       const data = await apiGet("/api/books");
@@ -411,8 +944,7 @@
       }
       state.books.forEach((id) => {
         const opt = document.createElement("option");
-        opt.value = id;
-        opt.textContent = id;
+        opt.value = id; opt.textContent = id;
         sel.appendChild(opt);
       });
       $("s-start").disabled = false;
@@ -428,22 +960,18 @@
     const chapter = parseInt($("s-chapter").value, 10) || 1;
     const limit = parseInt($("s-limit").value, 10) || 20;
     if (!bookId) return;
-
     try {
       $("s-feedback").textContent = "Loading…";
       const sel = await apiPost("/api/select", { book_id: bookId, chapter_number: chapter });
       state.book = sel.state.book;
       state.chapter = sel.state.chapter;
       state.user = sel.state.user;
-
       const sess = await apiPost("/api/session/start", { limit });
       state.queue = sess.queue || [];
       state.queueSize = state.queue.length;
       state.sessionActive = true;
       $("s-feedback").textContent =
         `Loaded ${state.book.title} — chapter ${state.chapter.number}. Queue: ${state.queueSize}.`;
-
-      // jump to practice tab
       document.querySelector('nav button[data-view="practice"]').click();
       renderPracticeShell();
       await nextWord();
@@ -452,17 +980,15 @@
     }
   }
 
-  // ------------------------------------------------------ practice: render
+  // ── Practice ───────────────────────────────────────────────────
   function renderPracticeShell() {
     $("practice-empty").style.display = "none";
     $("practice-done").style.display = "none";
     $("practice-card").style.display = "block";
   }
-
   function renderItem(item) {
     state.current = item;
     state.revealed = false;
-
     $("p-word").textContent = item.lemma;
     const wk = item.knowledge || {};
     const status = wk.known_status || "new";
@@ -472,12 +998,10 @@
       `<span class="pill ${status}">${status}</span> ` +
       `<span class="pill">${seen} attempts</span> ` +
       `<span class="pill">${acc}%</span>`;
-
     const remaining = state.queue.length;
     const done = state.queueSize - remaining - 1;
     $("p-bar").style.width =
       state.queueSize ? `${((done + 1) / state.queueSize) * 100}%` : "0%";
-
     $("p-reveal").classList.add("hidden");
     $("p-reveal").innerHTML = "";
     $("p-assess").style.display = "none";
@@ -487,61 +1011,40 @@
     $("p-enrich").disabled = !!item.is_enriched;
     $("p-enrich").textContent = item.is_enriched ? "Already enriched" : "Enrich with AI";
   }
-
   function buildRevealHtml(item) {
     const entry = item.entry || {};
     const entries = entry.entries || [];
-    const linguistics = entry.linguistics || { explanation: "", edge_cases: [] };
+    const ling = entry.linguistics || { explanation: "", edge_cases: [] };
     const examples = item.examples || [];
-
     let html = "";
-
     if (entries.length === 0) {
       html += `<div class="explanation" style="color:var(--muted)">
-        No enriched data yet. Tap <b>Enrich with AI</b> below to generate
-        translations and a linguistic explanation.
-      </div>`;
+        No enriched data yet. Tap <b>Enrich with AI</b> to generate translations.</div>`;
     } else {
-      // translations from every form entry, flattened, deduped
-      const seen = new Set();
-      const trs = [];
-      entries.forEach((e) =>
-        (e.translations || []).forEach((t) => {
-          const k = t.toLowerCase();
-          if (!seen.has(k)) { seen.add(k); trs.push(t); }
-        })
-      );
+      const seen = new Set(); const trs = [];
+      entries.forEach((e) => (e.translations || []).forEach((t) => {
+        const k = t.toLowerCase();
+        if (!seen.has(k)) { seen.add(k); trs.push(t); }
+      }));
       if (trs.length) {
         html += `<div class="translations">${
           trs.map((t) => `<span>${escapeHtml(t)}</span>`).join("")
         }</div>`;
       }
-
-      // forms + relations
-      html += entries
-        .map(
-          (e) =>
-            `<div class="form-row">
-              <div><b>${escapeHtml(e.form)}</b></div>
-              <div class="relation">${escapeHtml(e.relation)}</div>
-            </div>`
-        )
-        .join("");
-
-      // explanation
-      if (linguistics.explanation) {
-        html += `<div class="explanation">${escapeHtml(linguistics.explanation)}</div>`;
+      html += entries.map((e) =>
+        `<div class="form-row">
+          <div><b>${escapeHtml(e.form)}</b></div>
+          <div class="relation">${escapeHtml(e.relation)}</div>
+        </div>`).join("");
+      if (ling.explanation) {
+        html += `<div class="explanation">${escapeHtml(ling.explanation)}</div>`;
       }
-
-      // edge cases
-      const edges = linguistics.edge_cases || [];
+      const edges = ling.edge_cases || [];
       if (edges.length) {
         html += `<ul class="edge-cases">${
           edges.map((e) => `<li>${escapeHtml(e)}</li>`).join("")
         }</ul>`;
       }
-
-      // semantic keywords
       const kws = entry.semantic_keywords || [];
       if (kws.length) {
         html += `<div class="translations" style="margin-top:12px">${
@@ -549,65 +1052,41 @@
         }</div>`;
       }
     }
-
-    // personalized examples
     if (examples.length) {
       html += `<h2 style="margin-top:18px">Examples</h2>`;
-      html += examples
-        .map(
-          (ex) =>
-            `<div class="example">
-              ${escapeHtml(ex.sentence)}
-              <div class="tr">${escapeHtml(ex.translation)}</div>
-            </div>`
-        )
-        .join("");
+      html += examples.map((ex) =>
+        `<div class="example">${escapeHtml(ex.sentence)}
+         <div class="tr">${escapeHtml(ex.translation)}</div></div>`).join("");
     }
-
     return html;
   }
-
   async function nextWord() {
     if (state.queue.length === 0) {
-      // ask the server once more — it may have more in a different chapter,
-      // or it will return null to signal "done".
       try {
         const res = await apiGet("/api/session/next");
-        if (!res.item) {
-          showDone();
-          return;
-        }
+        if (!res.item) { showDone(); return; }
         renderPracticeShell();
         renderItem(res.item);
         return;
-      } catch (err) {
-        showDone();
-        return;
-      }
+      } catch { showDone(); return; }
     }
-
     try {
       const res = await apiGet("/api/session/next");
       if (!res.item) { showDone(); return; }
-      // sync local queue count if server pushed something
       renderItem(res.item);
     } catch (err) {
       $("p-feedback").textContent = `Error: ${err.message}`;
     }
   }
-
   function showDone() {
     state.sessionActive = false;
     state.current = null;
     $("practice-card").style.display = "none";
     $("practice-empty").style.display = "none";
     $("practice-done").style.display = "block";
-    // refresh progress in background
     loadProgress();
   }
-
-  // --------------------------------------------------- practice: actions
-  async function reveal() {
+  function reveal() {
     if (!state.current) return;
     state.revealed = true;
     $("p-reveal").innerHTML = buildRevealHtml(state.current);
@@ -615,7 +1094,6 @@
     $("p-assess").style.display = "flex";
     $("p-reveal-btn").style.display = "none";
   }
-
   async function answer(correct) {
     if (!state.current) return;
     try {
@@ -629,48 +1107,46 @@
       $("p-feedback").textContent = `Error: ${err.message}`;
     }
   }
-
   async function skipCurrent() {
     if (!state.current) return;
     try {
       await apiPost(`/api/word/${encodeURIComponent(state.current.lemma)}/skip`, {});
       state.queue.shift();
       await nextWord();
-    } catch (err) {
-      $("p-feedback").textContent = `Error: ${err.message}`;
-    }
+    } catch (err) { $("p-feedback").textContent = `Error: ${err.message}`; }
   }
-
+  async function markKnownCurrent() {
+    if (!state.current) return;
+    try {
+      await apiPost(`/api/word/${encodeURIComponent(state.current.lemma)}/known`, {});
+      state.queue.shift();
+      await nextWord();
+    } catch (err) { $("p-feedback").textContent = `Error: ${err.message}`; }
+  }
   async function enrichCurrent() {
     if (!state.current) return;
     $("p-enrich").disabled = true;
     $("p-enrich").textContent = "Enriching…";
     try {
-      const res = await apiPost(
-        `/api/word/${encodeURIComponent(state.current.lemma)}/enrich`,
-        {}
-      );
+      const res = await apiPost(`/api/word/${encodeURIComponent(state.current.lemma)}/enrich`, {});
       if (res.enriched) {
-        // re-fetch full word payload
         const detail = await apiGet(`/api/word/${encodeURIComponent(state.current.lemma)}`);
         if (detail.word) {
           state.current = detail.word;
-          if (state.revealed) {
-            $("p-reveal").innerHTML = buildRevealHtml(state.current);
-          }
+          if (state.revealed) $("p-reveal").innerHTML = buildRevealHtml(state.current);
         }
         $("p-enrich").textContent = "Enriched ✓";
       } else {
-        $("p-enrich").textContent = "Enrich failed — retry";
+        $("p-enrich").textContent = "Enrich returned nothing — retry";
         $("p-enrich").disabled = false;
       }
-    } catch (err) {
+    } catch {
       $("p-enrich").textContent = "Enrich failed — retry";
       $("p-enrich").disabled = false;
     }
   }
 
-  // -------------------------------------------------------------- progress
+  // ── Progress ──────────────────────────────────────────────────
   async function loadProgress() {
     try {
       const data = await apiGet("/api/progress");
@@ -682,52 +1158,40 @@
         return;
       }
       $("progress-empty").style.display = "none";
-
-      list.innerHTML = chapters
-        .map((ch) => {
-          const r = ch.readiness || {};
-          const ratio = (r.readiness_ratio ?? 0) * 100;
-          const cls = ratio >= 80 ? "ready" : ratio >= 40 ? "medium" : "low";
-          const score = ch.score ? (ch.score.score ?? 0) : 0;
-          return `
-            <div class="card chapter-row">
-              <div class="chapter-head">
-                <span class="title">Ch. ${ch.number}${ch.title ? " — " + escapeHtml(ch.title) : ""}</span>
-                <span class="score">score ${(score * 100).toFixed(0)}%</span>
-              </div>
-              <div class="readiness-bar ${cls}">
-                <span style="width:${ratio.toFixed(1)}%"></span>
-              </div>
-              <div class="chapter-meta">
-                ${r.ready_words ?? 0} known · ${r.learning_words ?? 0} learning · ${r.new_words ?? 0} new
-                · ${ratio.toFixed(0)}% ready
-              </div>
+      list.innerHTML = chapters.map((ch) => {
+        const r = ch.readiness || {};
+        const ratio = (r.readiness_ratio ?? 0) * 100;
+        const cls = ratio >= 80 ? "ready" : ratio >= 40 ? "medium" : "low";
+        const score = ch.score ? (ch.score.score ?? 0) : 0;
+        return `
+          <div class="card chapter-row">
+            <div class="chapter-head">
+              <span class="title">Ch. ${ch.number}${ch.title ? " — " + escapeHtml(ch.title) : ""}</span>
+              <span class="score">score ${(score * 100).toFixed(0)}%</span>
             </div>
-          `;
-        })
-        .join("");
+            <div class="readiness-bar ${cls}">
+              <span style="width:${ratio.toFixed(1)}%"></span>
+            </div>
+            <div class="chapter-meta">
+              ${r.ready_words ?? 0} known · ${r.learning_words ?? 0} learning · ${r.new_words ?? 0} new · ${ratio.toFixed(0)}% ready
+            </div>
+          </div>`;
+      }).join("");
     } catch (err) {
       $("progress-empty").style.display = "block";
       $("progress-empty").textContent = `Progress unavailable: ${err.message}`;
     }
   }
 
-  // ------------------------------------------------------------- helpers
-  function escapeHtml(s) {
-    return String(s ?? "")
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
-
-  // ---------------------------------------------------------- wire-up
+  // ── Wire-up ───────────────────────────────────────────────────
   $("s-start").addEventListener("click", startSession);
   $("p-reveal-btn").addEventListener("click", reveal);
   $("p-good").addEventListener("click", () => answer(true));
   $("p-bad").addEventListener("click", () => answer(false));
   $("p-skip").addEventListener("click", skipCurrent);
+  $("p-known").addEventListener("click", markKnownCurrent);
   $("p-enrich").addEventListener("click", enrichCurrent);
   $("p-again").addEventListener("click", async () => {
-    // start a fresh queue with the same book/chapter
     try {
       const limit = parseInt($("s-limit").value, 10) || 20;
       const sess = await apiPost("/api/session/start", { limit });
@@ -737,13 +1201,20 @@
       $("practice-done").style.display = "none";
       renderPracticeShell();
       await nextWord();
-    } catch (err) {
-      $("p-feedback").textContent = `Error: ${err.message}`;
-    }
+    } catch (err) { $("p-feedback").textContent = `Error: ${err.message}`; }
   });
+  $("w-book").addEventListener("change", async (e) => {
+    await populateWordChapters(e.target.value);
+    await populateWordKeywords(e.target.value);
+  });
+  $("w-sort").addEventListener("change", () => loadWords(0));
+  $("w-keyword").addEventListener("change", () => loadWords(0));
 
-  // boot
-  loadBooks();
+  // ── boot ──────────────────────────────────────────────────────
+  loadBooks().catch(() => {});
+  loadRawBookList().catch(() => {});
+  startPolling();
+  setInterval(pollLog, 1000);
 })();
 </script>
 </body>

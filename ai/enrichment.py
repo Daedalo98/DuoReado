@@ -1,80 +1,39 @@
 """ai/enrichment.py
+Shared enrichment service: turns a bare lemma into a fully populated
+`VocabularyEntry` (forms, translations, explanation, edge cases, keywords).
 
-Standalone vocabulary enrichment. Takes **only a lemma and a language**;
-it never sees a BookIndex, a chapter, or a UI session. This is what makes
-the AI section a self-contained service.
-
-It calls the transport layer (`OllamaClient.generate`) and then parses the
-response with the same tolerant parser the client already ships
-(`_extract_json_object`), aliased here as `_parse_json` so the rest of the
-module reads cleanly.
+Design rules
+------------
+* The prompt is JSON-only, so parsing is deterministic (see `_extract_json_object`).
+* We enrich *the lemma*, never the chapter context — this module is book-agnostic.
+* Every helper here is idempotent: calling it twice on a non-empty entry is a no-op.
 """
 from __future__ import annotations
 
-from typing import Any
-
 from ai.ollama_client import OllamaClient, OllamaError, _extract_json_object
-from models.schemas import VocabularyEntry, WordFormEntry, WordLinguistics
+from models.schemas import WordFormEntry, WordLinguistics, VocabularyEntry
 
-# Alias so the body of the module can call a stable name.
-_parse_json = _extract_json_object
-
-
-ENRICH_SYSTEM = """You are a lexicographer.
-Return ONLY a valid JSON object with this exact schema:
+# Prompt intentionally tight: only a JSON object, no prose.
+ENRICH_SYSTEM = """You are a precise bilingual lexicographer.
+Return ONLY a valid JSON object with this shape:
 {
-  "entries": [{"form": str, "relation": str, "translations": [str]}],
-  "linguistics": {"explanation": str, "edge_cases": [str]},
-  "semantic_keywords": [str]
+  "entries": [
+    {"form": "<inflected form>", "relation": "base|plural|past|...",
+     "translations": ["...", "..."]}
+  ],
+  "explanation": "<1-3 sentence usage note>",
+  "edge_cases": ["<common mistake or subtlety>", "..."],
+  "semantic_keywords": ["<single word>", "..."]
 }
 Rules:
-- "relation" is one of: base, feminine variation, masculine variation,
-  plural variation, feminine plural variation, diminutive, augmentative,
-  related form.
-- Include the base form first.
-- Keep the explanation under 60 words.
-- Provide 3 to 6 semantic keywords.
-No markdown fences. No prose outside the JSON object."""
+- At least one entry MUST have relation "base".
+- translations are in the user's native language.
+- No markdown fences. No prose outside the JSON object."""
 
 
-def enrich_word(
-    lemma: str,
-    language: str,
-    client: OllamaClient,
-    *,
-    native_language: str = "en",
-) -> dict[str, Any] | None:
-    """Ask the LLM to describe `lemma`. Returns the parsed payload or None."""
-    prompt = (
-        f"Target language: {language}. Native language: {native_language}.\n"
-        f"Word: '{lemma}'.\n"
-        "List the base form, gender/number variations, diminutives and "
-        "common related forms. Add a concise linguistic explanation, "
-        "edge cases (colloquial / idiomatic uses) and semantic keywords."
-    )
-    try:
-        raw = client.generate(prompt, system=ENRICH_SYSTEM, use_cache=True)
-    except OllamaError:
-        return None
-    return _parse_json(raw)
-
-
-def apply_enrichment(entry: VocabularyEntry, payload: dict[str, Any]) -> None:
-    """Merge the LLM payload into a (previously empty) VocabularyEntry."""
-    entry.entries = [
-        WordFormEntry(
-            form=e.get("form", ""),
-            relation=e.get("relation", "base"),
-            translations=list(e.get("translations", [])),
-        )
-        for e in payload.get("entries", [])
-    ]
-    ling = payload.get("linguistics", {}) or {}
-    entry.linguistics = WordLinguistics(
-        explanation=ling.get("explanation", ""),
-        edge_cases=list(ling.get("edge_cases", [])),
-    )
-    entry.semantic_keywords = list(payload.get("semantic_keywords", []))
+def _parse(raw: str) -> dict | None:
+    """Wrapper so we can swap parsers later without touching call sites."""
+    return _extract_json_object(raw)
 
 
 def enrich_if_empty(
@@ -82,18 +41,69 @@ def enrich_if_empty(
     lemma: str,
     language: str,
     client: OllamaClient,
-    *,
     native_language: str = "en",
 ) -> bool:
-    """Convenience: enrich only if the entry has not been enriched yet.
+    """Populate `entry` in-place if it has no translations yet.
 
-    Returns True if enrichment happened, False otherwise (already rich or
-    LLM failure). Does **not** persist — callers save the book JSON.
+    Returns True iff new data was written. When False, the caller should
+    treat the entry as already enriched (and skip re-saving the book).
     """
-    if entry.entries:
+    # Idempotency guard — already done.
+    if entry.has_translations:
         return False
-    payload = enrich_word(lemma, language, client, native_language=native_language)
-    if not payload:
+
+    prompt = (
+        f"Target language: {language}. Native language: {native_language}.\n"
+        f"Enrich the {language} lemma '{lemma}'."
+    )
+
+    try:
+        raw = client.generate(prompt, system=ENRICH_SYSTEM, use_cache=True)
+    except OllamaError:
         return False
-    apply_enrichment(entry, payload)
+
+    data = _parse(raw)
+    if not isinstance(data, dict):
+        return False
+
+    # ── entries ──────────────────────────────────────────────────────
+    raw_entries = data.get("entries") or []
+    new_entries: list[WordFormEntry] = []
+    for e in raw_entries:
+        if not isinstance(e, dict):
+            continue
+        form = str(e.get("form") or lemma).strip()
+        relation = str(e.get("relation") or "base").strip() or "base"
+        translations = [str(t).strip() for t in (e.get("translations") or []) if str(t).strip()]
+        if not translations:
+            continue
+        new_entries.append(
+            WordFormEntry(form=form, relation=relation, translations=translations)
+        )
+    if not new_entries:
+        # No usable translations → don't mark enriched.
+        return False
+    entry.entries = new_entries
+
+    # ── linguistics ──────────────────────────────────────────────────
+    ling = data.get("linguistics") if isinstance(data.get("linguistics"), dict) else {}
+    explanation = str(data.get("explanation") or ling.get("explanation") or "").strip()
+    edge_cases = [
+        str(x).strip()
+        for x in (data.get("edge_cases") or ling.get("edge_cases") or [])
+        if str(x).strip()
+    ]
+    entry.linguistics = WordLinguistics(
+        explanation=explanation,
+        edge_cases=edge_cases,
+    )
+
+    # ── semantic keywords ────────────────────────────────────────────
+    kws = [
+        str(k).strip().lstrip("#")
+        for k in (data.get("semantic_keywords") or [])
+        if str(k).strip()
+    ]
+    entry.semantic_keywords = kws
+
     return True

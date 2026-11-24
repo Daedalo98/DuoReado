@@ -1,191 +1,309 @@
 """ingestion/json_builder.py
+BookIndex serialisation + the missing helpers that other modules rely on:
+    * book_path(book_id)                — path to <book_id>.json
+    * load_granted_lemmas(language)     — set of lemmas to skip at build time
+    * build_book_index(...)             — aggregate loader output into BookIndex
+    * load_book_index / save_book_index — encoding-safe, atomic I/O
+    * list_book_ids / list_saved_books  — discovery helpers
 
-Phase 1 of the pipeline. Produces the *skeleton* vocabulary JSON:
-
-    {"words": {"abuelo": {"occurrences": 14, "first_chapter": 2,
-                          "entries": [], "linguistics": {...}, "semantic_keywords": []}}}
-
-The empty fields are filled later by ai/enrichment.py.
-
-Design notes
-------------
-- Granted words (`data/granted/granted_<lang>.json`) are removed BEFORE
-  aggregation so they never appear in any output structure.
-- The loader is language-agnostic: pass "es", "fr", "pt", ...
-- `build_book_index` accepts an already-parsed list of ChapterInfo. PDF
-  parsing / tokenization belong to the caller; this module only aggregates.
+Re-ingestion is always safe because user progress lives in UserProgress,
+never in the BookIndex JSON.
 """
 from __future__ import annotations
 
 import json
 import os
-from collections import Counter
-from dataclasses import replace
+import re
+from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Any
 
-from config import DATA_DIR
-from models.schemas import BookIndex, ChapterInfo, VocabularyEntry, Occurrence
-
-BOOKS_DIR = DATA_DIR / "books"
-GRANTED_DIR = DATA_DIR / "granted"
-
-# Keys inside the granted JSON that hold prose, not words.
-_NOTE_KEYS = {"note", "notes", "comment", "comments", "explanation", "gloss"}
-
-
-# ---------------------------------------------------------------------------
-# Granted-words loader (multi-language)
-# ---------------------------------------------------------------------------
-
-def _granted_paths(language: str) -> list[Path]:
-    """Ordered search paths for the granted file of `language`."""
-    return [
-        GRANTED_DIR / f"granted_{language}.json",     # canonical
-        DATA_DIR / f"granted_{language}.json",        # legacy location
-        DATA_DIR / "granted.json",                    # single-language fallback
-    ]
+from config import (
+    BOOKS_DIR,
+    GRANTED_DIR,
+    TEXTS_DIR,
+    ensure_directories,
+    log,
+    safe_read_text,
+    safe_write_text,
+)
+from models.schemas import (
+    BookIndex,
+    ChapterInfo,
+    Occurrence,
+    VocabularyEntry,
+)
 
 
-def _flatten_granted(node, out: set[str], parent_key: str | None = None) -> None:
-    """Recursively walk the granted JSON and collect every word string.
+# ── Small helpers ────────────────────────────────────────────────────────
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
-    - Strings whose *parent key* is a prose key (`note`, ...) are skipped.
-    - Both sides of `accented_homonym_pairs` are collected, because both
-      are considered granted by the user.
-    - Lowercasing makes matching case-insensitive (most lemmatizers already
-      return lowercase, but this is safe either way).
+
+def _slugify(text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+    return slug or "book"
+
+
+# ── Paths ────────────────────────────────────────────────────────────────
+def book_path(book_id: str) -> Path:
+    """Path to the on-disk JSON for a given book id."""
+    ensure_directories()
+    return BOOKS_DIR / f"{book_id}.json"
+
+
+# Backwards-compatible alias (older code imported `get_book_json_path`).
+get_book_json_path = book_path
+
+def sentences_path(book_id: str) -> Path:
+    ensure_directories()
+    return BOOKS_DIR / f"{book_id}.sentences.json"
+
+
+def text_path(book_id: str) -> Path:
+    ensure_directories()
+    return TEXTS_DIR / f"{book_id}.txt"
+
+# ── Text sidecar (paginated prose) ──────────────────────────────────────
+_PAGE_MARKER_RE = re.compile(r"^---\s*PAGE\s+(\d+)\s*---\s*$", re.MULTILINE)
+
+def save_book_text(book_id: str, pages: list) -> Path:
+    """Write a paginated text file: ``--- PAGE N ---`` followed by page text.
+
+    Accepts any object with ``.page_number`` and ``.text`` (ExtractedPage).
     """
-    if isinstance(node, str):
-        if parent_key in _NOTE_KEYS:
-            return
-        s = node.strip().lower()
-        if s:
-            out.add(s)
-    elif isinstance(node, dict):
-        for key, value in node.items():
-            _flatten_granted(value, out, parent_key=key)
-    elif isinstance(node, (list, tuple)):
-        for item in node:
-            _flatten_granted(item, out, parent_key=parent_key)
+    path = text_path(book_id)
+    parts = [
+        f"--- PAGE {p.page_number} ---\n{p.text}"
+        for p in pages
+        if p.text.strip()
+    ]
+    safe_write_text(path, "\n\n".join(parts))
+    log.info("Saved full text → %s (%d KB)", path, path.stat().st_size // 1024)
+    return path
+
+def read_chapter_text(book_id: str, chapter: ChapterInfo) -> str:
+    """Return the chapter's prose.
+
+    Prefers the paginated ``.txt`` file. Falls back to ``chapter.text``
+    (embedded in old book JSONs before this split) so previously-ingested
+    books keep working.
+    """
+    if chapter.text:
+        return chapter.text
+
+    path = text_path(book_id)
+    if not path.exists():
+        return ""
+    raw = safe_read_text(path)
+
+    # Split into alternating (page_number, page_text) chunks.
+    pages_by_num: dict[int, str] = {}
+    parts = _PAGE_MARKER_RE.split(raw)
+    for i in range(1, len(parts) - 1, 2):
+        try:
+            num = int(parts[i])
+        except ValueError:
+            continue
+        pages_by_num[num] = parts[i + 1].strip()
+
+    selected = [
+        pages_by_num[n]
+        for n in range(chapter.start_page, chapter.end_page + 1)
+        if n in pages_by_num
+    ]
+    return "\n\n".join(selected)
+
+
+# ── Sentences sidecar ───────────────────────────────────────────────────
+def save_sentences(book_id: str, sentences_by_lemma: dict[str, list[Occurrence]]) -> Path:
+    path = sentences_path(book_id)
+    payload: dict[str, list[dict]] = {}
+    for lemma, occs in sentences_by_lemma.items():
+        if not occs:
+            continue
+        payload[lemma] = [asdict(o) for o in occs]
+    safe_write_text(path, json.dumps(payload, ensure_ascii=False))
+    log.info("Saved sentences → %s (%d KB, %d lemmas)",
+             path, path.stat().st_size // 1024, len(payload))
+    return path
+
+
+def load_sentences(book_id: str) -> dict[str, list[Occurrence]]:
+    path = sentences_path(book_id)
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(safe_read_text(path))
+    except Exception as exc:
+        log.warning("Could not load sentences for %s: %s", book_id, exc)
+        return {}
+    out: dict[str, list[Occurrence]] = {}
+    for lemma, occs in data.items():
+        try:
+            out[lemma] = [Occurrence(**o) for o in occs]
+        except Exception:
+            continue
+    return out
+
+
+# ── Granted lemmas ──────────────────────────────────────────────────────
+# The granted file may be a flat list ["a", "el", …], the old
+# {"lemmas": [...]} shape, OR the rich structured layout you have for
+# Spanish (nested categories + accented_homonym_pairs). The walker below
+# handles all three.
+#
+# Rules:
+#   * every *string value* becomes a lemma (lowercased, punctuation stripped)
+#   * multi-word expressions are split into their individual words, so
+#     "sin embargo" grants both "sin" and "embargo" — matches what the
+#     tokenizer actually produces
+#   * keys named note / description / comment / hint are skipped, so prose
+#     like "article vs. pronoun (he/him)" never becomes a "lemma"
+#   * the file can live in several conventional places; we search them in order
+#     and fall back to a bounded rglob over the project root
+
+_PROSE_KEYS = {"note", "description", "comment", "hint", "explanation"}
+
+_STRIP_CHARS = ".,;:!?\"'()[]{}«»¿¡“”‘’—–"
+
+
+def _collect_granted(value: Any, out: set[str]) -> None:
+    """Recursively flatten a granted-words JSON value into `out`."""
+    if isinstance(value, str):
+        # Multi-word phrase → individual words. Strip surrounding punctuation.
+        for token in value.lower().replace(",", " ").split():
+            token = token.strip(_STRIP_CHARS)
+            if token:
+                out.add(token)
+    elif isinstance(value, list):
+        for item in value:
+            _collect_granted(item, out)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if key.lower() in _PROSE_KEYS:
+                continue
+            _collect_granted(item, out)
+
+
+def _read_granted_file(path: Path) -> set[str]:
+    try:
+        data = json.loads(safe_read_text(path))
+    except Exception as exc:
+        log.error("Could not parse granted-lemma file %s: %s", path, exc)
+        return set()
+    out: set[str] = set()
+    _collect_granted(data, out)
+    log.info("Loaded %d granted lemma(s) from %s", len(out), path)
+    return out
 
 
 def load_granted_lemmas(language: str) -> set[str]:
-    """Return the set of lemmas the user already knows for `language`.
+    """Return the set of lemmas the user is *not* studying for `language`.
 
-    Returns an empty set if no granted file exists — the pipeline still
-    works, it just does not filter anything.
+    Missing file → empty set (nothing filtered), with a warning.
     """
-    for path in _granted_paths(language):
-        if not path.exists():
+    lang = (language or "en").lower()[:2]
+
+    path = GRANTED_DIR / f"granted_{lang}.json"
+    if path.exists():
+        return _read_granted_file(path)
+    else:
+        log.warning("No granted-lemma file found at %s", path)
+        return set()
+
+# ── Load / save BookIndex ────────────────────────────────────────────────
+def load_book_index(book_id_or_path: str | Path) -> BookIndex:
+    """Load a BookIndex from an id (`don_quijote_es`) or a full path."""
+    path = Path(book_id_or_path)
+    if not path.suffix:            # caller passed an id, not a path
+        path = book_path(str(path))
+    raw = safe_read_text(path)
+    return BookIndex.from_dict(json.loads(raw))
+
+
+def save_book_index(book: BookIndex) -> Path:
+    """Atomically write a BookIndex to disk (temp + os.replace)."""
+    ensure_directories()
+    target = book_path(book.book_id)
+    tmp = target.with_suffix(".json.tmp")
+    payload = json.dumps(book.to_dict(), ensure_ascii=False, indent=2)
+    safe_write_text(tmp, payload)
+    os.replace(tmp, target)
+    log.debug("Saved book index → %s", target)
+    return target
+
+
+# ── Discovery ────────────────────────────────────────────────────────────
+def list_book_ids() -> list[str]:
+    ensure_directories()
+    return sorted(
+        p.stem for p in BOOKS_DIR.glob("*.json")
+        if not p.stem.endswith(".sentences")
+    )
+
+
+def list_saved_books() -> list[dict[str, str]]:
+    ensure_directories()
+    out: list[dict[str, str]] = []
+    for json_file in sorted(BOOKS_DIR.glob("*.json")):
+        if json_file.stem.endswith(".sentences"):
             continue
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            continue
-        out: set[str] = set()
-        _flatten_granted(raw, out)
-        return out
-    return set()
+            data = json.loads(safe_read_text(json_file))
+            out.append({
+                "book_id": data.get("book_id", json_file.stem),
+                "title": data.get("title", json_file.stem),
+                "author": data.get("metadata", {}).get("author", "Unknown"),
+                "language": data.get("language", "en"),
+                "json_path": str(json_file),
+            })
+        except Exception as exc:
+            log.warning("Skipping corrupt book file %s: %s", json_file, exc)
+    return out
 
 
-# ---------------------------------------------------------------------------
-# Aggregation
-# ---------------------------------------------------------------------------
-
-def _chapter_counter(chapter: ChapterInfo) -> Counter[str]:
-    """Prefer the explicit word_counts; fall back to counting word_lemmas."""
-    if chapter.word_counts:
-        return Counter(chapter.word_counts)
-    return Counter(chapter.word_lemmas)
-
-
-def _filter_chapter(chapter: ChapterInfo, granted: set[str]) -> ChapterInfo:
-    """Return a copy of `chapter` with granted lemmas removed from its lists."""
-    kept_lemmas = [l for l in chapter.word_lemmas if l.lower() not in granted]
-    kept_counts = {
-        k: v for k, v in chapter.word_counts.items() if k.lower() not in granted
-    }
-    return replace(chapter, word_lemmas=kept_lemmas, word_counts=kept_counts)
-
-
+# ── Aggregation (loader) ────────────────────────────────────────────────
 def build_book_index(
     *,
     book_id: str,
     title: str,
     language: str,
     source_pdf: str,
-    chapters: Iterable[ChapterInfo],
-    granted: set[str] | None = None,
-    metadata: dict | None = None,
+    chapters: list[ChapterInfo],
+    granted: set[str],
+    metadata: dict[str, Any] | None = None,
 ) -> BookIndex:
-    """Assemble a BookIndex from already-parsed chapters.
+    """Aggregate tokenised chapters into a BookIndex.
 
-    `granted` is optional; if omitted it is loaded from disk for `language`.
-    Passing it explicitly is the recommended way to unit-test the builder.
+    Sentences are NOT embedded here — the loader saves them to a sidecar
+    via ``save_sentences``. This keeps the main JSON small.
     """
-    granted = granted if granted is not None else load_granted_lemmas(language)
+    words: dict[str, VocabularyEntry] = {}
+    for ch in chapters:
+        for lemma, count in ch.word_counts.items():
+            if lemma in granted:
+                continue
+            entry = words.get(lemma)
+            if entry is None:
+                entry = VocabularyEntry()
+                words[lemma] = entry
+            entry.occurrences += int(count)
+            if entry.first_chapter == 0 or ch.number < entry.first_chapter:
+                entry.first_chapter = ch.number
 
-    book = BookIndex(
+    return BookIndex(
         book_id=book_id,
         title=title,
         language=language,
         source_pdf=source_pdf,
         metadata=dict(metadata or {}),
+        chapters=chapters,
+        words=words,
     )
 
-    for chapter in chapters:
-        # 1) Strip granted lemmas so they never reach the output.
-        filtered = _filter_chapter(chapter, granted)
-        book.chapters.append(filtered)
 
-        # 2) Aggregate ONLY the cheap fields. Enrichment stays empty.
-        counts = _chapter_counter(filtered)
-        for lemma, count in counts.items():
-            if not lemma:
-                continue
-            entry = book.words.setdefault(lemma, VocabularyEntry())
-            entry.occurrences += count
-            if entry.first_chapter == 0:
-                entry.first_chapter = filtered.number
-            if len(entry.sentences) < 5:
-                entry.sentences.append(
-                    Occurrence(chapter_id=filtered.chapter_id, page=filtered.start_page)
-                )
-
-    return book
-
-
-# ---------------------------------------------------------------------------
-# Persistence (atomic write)
-# ---------------------------------------------------------------------------
-
-def book_path(book_id: str, books_dir: Path | None = None) -> Path:
-    return (books_dir or BOOKS_DIR) / f"{book_id}.json"
-
-
-def save_book_index(book: BookIndex, books_dir: Path | None = None) -> Path:
-    """Write the book JSON atomically (tmp + os.replace)."""
-    path = book_path(book.book_id, books_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(
-        json.dumps(book.to_dict(), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    os.replace(tmp, path)
-    return path
-
-
-def load_book_index(book_id: str, books_dir: Path | None = None) -> BookIndex:
-    path = book_path(book_id, books_dir)
-    if not path.exists():
-        raise FileNotFoundError(f"Book JSON not found: {path}")
-    return BookIndex.from_dict(json.loads(path.read_text(encoding="utf-8")))
-
-
-def list_book_ids(books_dir: Path | None = None) -> list[str]:
-    d = books_dir or BOOKS_DIR
-    if not d.exists():
-        return []
-    return sorted(p.stem for p in d.glob("*.json"))
+# ── Called by the CLI in loader.py ──────────────────────────────────────
+def _print_progress(stage: str, current: int, total: int) -> None:
+    print(f"  [{current}/{total}] {stage}")
