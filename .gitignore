@@ -1,4 +1,6 @@
 # Ignore the following files and directories
 
 .venv/
-data/
+data/pdfs
+data/texts
+data/users

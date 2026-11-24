@@ -13,6 +13,8 @@ DATA_DIR = BASE_DIR / "data"
 BOOKS_DIR = DATA_DIR / "books"
 TEXTS_DIR = DATA_DIR / "texts"
 CACHE_DIR = DATA_DIR / "cache"
+GRANTED_ES_PATH = Path(__file__).resolve().parent / "spanish" / "granted_es.json"
+
 
 # Default Ollama server settings
 OLLAMA_BASE_URL = "http://localhost:11434"

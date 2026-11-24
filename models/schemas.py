@@ -1,9 +1,15 @@
-"""
-models/schemas.py
-Data structures representing a parsed book, its chapters, word occurrences,
-and the user's learning accuracy/mastery state.
-"""
+"""models/schemas.py
 
+Design overview
+---------------
+BookIndex          : the shared, regenerable vocabulary extracted from a PDF.
+VocabularyEntry    : what a word *is* (static, language-level knowledge).
+UserProgress       : what a *user* knows about those words (per-user, persistent).
+
+The split is deliberate: the book JSON can be rebuilt from the PDF at any
+time without destroying a user's history, and the AI layer only ever needs
+a lemma string.
+"""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
@@ -11,203 +17,282 @@ from datetime import datetime, timezone
 from typing import Any
 
 
-def utc_now_iso() -> str:
-    """Return current UTC timestamp in ISO-8601 format."""
-    return datetime.now(timezone.utc).isoformat()
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+# ---------------------------------------------------------------------------
+# Book side (shared, regenerable)
+# ---------------------------------------------------------------------------
 
 @dataclass
 class Occurrence:
-    """A single appearance of a word in the book."""
+    """One occurrence of a word inside a chapter. Build-time only; not saved
+    in the final book JSON — we only persist the aggregate counts."""
     chapter_id: str
-    page: int
-    sentence: str
+    page: int = 0
+    snippet: str = ""
+    sentence: str = ""
+    translation: str = ""
 
 
 @dataclass
 class ChapterInfo:
-    """Metadata and text boundaries for a single chapter."""
     chapter_id: str
-    title: str
-    start_page: int  # 1-based page number
-    end_page: int    # 1-based page number (inclusive)
-    text: str = ""
+    number: int                       # 1-based chapter index (used for first_chapter)
+    title: str = ""
+    start_page: int = 0
+    end_page: int = 0
     word_lemmas: list[str] = field(default_factory=list)
+    word_counts: dict[str, int] = field(default_factory=dict)
+    text: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ChapterInfo":
+        return cls(
+            chapter_id=data.get("chapter_id", ""),
+            number=data.get("number", 0),
+            title=data.get("title", ""),
+            start_page=data.get("start_page", 0),
+            end_page=data.get("end_page", 0),
+            word_lemmas=list(data.get("word_lemmas", [])),
+            word_counts=dict(data.get("word_counts", {})),
+            text=data.get("text", ""),
+        )
 
 
 @dataclass
-class WordEntry:
-    """
-    Represents a normalized dictionary/base word (lemma) across the book
-    along with all surface forms, occurrences, and user mastery metrics.
-    """
-    lemma: str
-    pos: str = ""
-    forms: dict[str, int] = field(default_factory=dict)          # surface_form -> count
-    total_count: int = 0
-    by_chapter: dict[str, int] = field(default_factory=dict)     # chapter_id -> count
-    pages: list[int] = field(default_factory=list)
-    occurrences: list[Occurrence] = field(default_factory=list)
-    translations: list[str] = field(default_factory=list)          # (b) most common direct translations
-    false_friends: list[str] = field(default_factory=list)         # (c) false friends & common mistranslations
-    edge_meanings: list[str] = field(default_factory=list)         # (d) edge meanings & peculiar uses
-    enriched_sentences: list[dict[str, str]] = field(default_factory=list)
-    # Each item in enriched_sentences:
-    # {"sentence": "...", "translation": "...", "related_word": "...", "source": "book|llm"}
-
-    # User learning & accuracy tracking
-    known_status: str = "new"  # "new" | "learning" | "mastered" | "skipped"
-    attempts: int = 0
-    correct: int = 0
-    accuracy: float = 0.0
-    streak: int = 0
-    last_reviewed: str | None = None
-    cached_translation: str = ""
-
-    def record_attempt(self, is_correct: bool) -> None:
-        """Update accuracy, streak, timestamp, and mastery status after an attempt."""
-        if self.known_status == "skipped":
-            self.known_status = "learning"
-
-        self.attempts += 1
-        if is_correct:
-            self.correct += 1
-            self.streak += 1
-        else:
-            self.streak = 0
-
-        self.accuracy = round(self.correct / self.attempts, 4) if self.attempts > 0 else 0.0
-        self.last_reviewed = utc_now_iso()
+class WordFormEntry:
+    """A morphological / relational variant of the base word."""
+    form: str
+    relation: str = "base"
+    translations: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to a JSON-serializable dictionary."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "WordFormEntry":
+        return cls(
+            form=data.get("form", ""),
+            relation=data.get("relation", "base"),
+            translations=list(data.get("translations", [])),
+        )
+
+
+@dataclass
+class WordLinguistics:
+    explanation: str = ""
+    edge_cases: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "WordLinguistics":
+        return cls(
+            explanation=data.get("explanation", ""),
+            edge_cases=list(data.get("edge_cases", [])),
+        )
+
+
+@dataclass
+class VocabularyEntry:
+    """The per-word record. Filled **in two phases**:
+
+    Phase 1 (build, cheap):   occurrences + first_chapter
+    Phase 2 (enrich, Ollama): entries + linguistics + semantic_keywords
+    """
+    occurrences: int = 0
+    first_chapter: int = 0
+    entries: list[WordFormEntry] = field(default_factory=list)
+    linguistics: WordLinguistics = field(default_factory=WordLinguistics)
+    semantic_keywords: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            "lemma": self.lemma,
-            "pos": self.pos,
-            "forms": self.forms,
-            "total_count": self.total_count,
-            "by_chapter": self.by_chapter,
-            "pages": self.pages,
-            "occurrences": [asdict(occ) for occ in self.occurrences],
-            "known_status": self.known_status,
-            "attempts": self.attempts,
-            "correct": self.correct,
-            "accuracy": self.accuracy,
-            "streak": self.streak,
-            "last_reviewed": self.last_reviewed,
-            "cached_translation": self.cached_translation,
+            "occurrences": self.occurrences,
+            "first_chapter": self.first_chapter,
+            "entries": [e.to_dict() for e in self.entries],
+            "linguistics": self.linguistics.to_dict(),
+            "semantic_keywords": list(self.semantic_keywords),
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "WordEntry":
-        """Reconstruct a WordEntry from a dictionary loaded from JSON."""
-        occurrences = [
-            Occurrence(
-                chapter_id=occ.get("chapter_id", "ch_1"),
-                page=int(occ.get("page", 1)),
-                sentence=occ.get("sentence", ""),
-            )
-            for occ in data.get("occurrences", [])
-        ]
+    def from_dict(cls, data: dict[str, Any]) -> "VocabularyEntry":
         return cls(
-            lemma=data["lemma"],
-            pos=data.get("pos", ""),
-            forms=dict(data.get("forms", {})),
-            total_count=int(data.get("total_count", 0)),
-            by_chapter=dict(data.get("by_chapter", {})),
-            pages=list(data.get("pages", [])),
-            occurrences=occurrences,
-            known_status=data.get("known_status", "new"),
-            attempts=int(data.get("attempts", 0)),
-            correct=int(data.get("correct", 0)),
-            accuracy=float(data.get("accuracy", 0.0)),
-            streak=int(data.get("streak", 0)),
-            last_reviewed=data.get("last_reviewed"),
-            cached_translation=data.get("cached_translation", ""),
+            occurrences=data.get("occurrences", 0),
+            first_chapter=data.get("first_chapter", 0),
+            entries=[WordFormEntry.from_dict(e) for e in data.get("entries", [])],
+            linguistics=WordLinguistics.from_dict(data.get("linguistics", {})),
+            semantic_keywords=list(data.get("semantic_keywords", [])),
         )
 
 
 @dataclass
 class BookIndex:
-    """Top-level JSON structure stored per book."""
     book_id: str
     title: str
-    author: str
-    language: str
-    total_pages: int
-    source_pdf: str
-    clean_txt_path: str
-    created_at: str
-    updated_at: str
+    language: str                    # BCP-47-ish code: "es", "fr", "pt", ...
+    source_pdf: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
     chapters: list[ChapterInfo] = field(default_factory=list)
-    words: dict[str, WordEntry] = field(default_factory=dict)  # keyed by lemma
+    words: dict[str, VocabularyEntry] = field(default_factory=dict)
 
-    def get_chapter(self, chapter_id: str) -> ChapterInfo | None:
-        """Find a chapter by its ID."""
-        for ch in self.chapters:
-            if ch.chapter_id == chapter_id:
-                return ch
+    def chapter_by_number(self, number: int) -> ChapterInfo | None:
+        for c in self.chapters:
+            if c.number == number:
+                return c
         return None
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize the entire book index for JSON export."""
         return {
-            "metadata": {
-                "book_id": self.book_id,
-                "title": self.title,
-                "author": self.author,
-                "language": self.language,
-                "total_pages": self.total_pages,
-                "source_pdf": self.source_pdf,
-                "clean_txt_path": self.clean_txt_path,
-                "created_at": self.created_at,
-                "updated_at": self.updated_at,
-                "total_unique_words": len(self.words),
-                "total_chapters": len(self.chapters),
-            },
-            "chapters": [
-                {
-                    "chapter_id": ch.chapter_id,
-                    "title": ch.title,
-                    "start_page": ch.start_page,
-                    "end_page": ch.end_page,
-                    "text": ch.text,
-                    "word_lemmas": ch.word_lemmas,
-                }
-                for ch in self.chapters
-            ],
-            "words": {lemma: entry.to_dict() for lemma, entry in self.words.items()},
+            "book_id": self.book_id,
+            "title": self.title,
+            "language": self.language,
+            "source_pdf": self.source_pdf,
+            "metadata": self.metadata,
+            "chapters": [c.to_dict() for c in self.chapters],
+            "words": {k: v.to_dict() for k, v in self.words.items()},
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "BookIndex":
-        """Deserialize a BookIndex from JSON data."""
-        meta = data.get("metadata", {})
-        chapters = [
-            ChapterInfo(
-                chapter_id=ch["chapter_id"],
-                title=ch["title"],
-                start_page=int(ch["start_page"]),
-                end_page=int(ch["end_page"]),
-                text=ch.get("text", ""),
-                word_lemmas=list(ch.get("word_lemmas", [])),
-            )
-            for ch in data.get("chapters", [])
-        ]
-        words = {
-            lemma: WordEntry.from_dict(w_data)
-            for lemma, w_data in data.get("words", {}).items()
-        }
         return cls(
-            book_id=meta.get("book_id", "book"),
-            title=meta.get("title", "Untitled Book"),
-            author=meta.get("author", "Unknown Author"),
-            language=meta.get("language", "en"),
-            total_pages=int(meta.get("total_pages", len(chapters))),
-            source_pdf=meta.get("source_pdf", ""),
-            clean_txt_path=meta.get("clean_txt_path", ""),
-            created_at=meta.get("created_at", utc_now_iso()),
-            updated_at=meta.get("updated_at", utc_now_iso()),
-            chapters=chapters,
-            words=words,
+            book_id=data.get("book_id", ""),
+            title=data.get("title", ""),
+            language=data.get("language", ""),
+            source_pdf=data.get("source_pdf", ""),
+            metadata=dict(data.get("metadata", {})),
+            chapters=[ChapterInfo.from_dict(c) for c in data.get("chapters", [])],
+            words={k: VocabularyEntry.from_dict(v) for k, v in data.get("words", {}).items()},
+        )
+
+
+# ---------------------------------------------------------------------------
+# User side (personal, persistent)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ChapterScore:
+    chapter_id: str
+    chapter_number: int
+    average_correctness: float = 0.0
+    known_words: int = 0
+    total_words: int = 0
+    score: float = 0.0               # average_correctness * known_words / total_words
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ChapterScore":
+        return cls(
+            chapter_id=data.get("chapter_id", ""),
+            chapter_number=data.get("chapter_number", 0),
+            average_correctness=data.get("average_correctness", 0.0),
+            known_words=data.get("known_words", 0),
+            total_words=data.get("total_words", 0),
+            score=data.get("score", 0.0),
+        )
+
+
+@dataclass
+class WordKnowledge:
+    lemma: str
+    attempts: int = 0
+    correct: int = 0
+    accuracy: float = 0.0
+    known_status: str = "new"        # new | learning | mastered | skipped
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "WordKnowledge":
+        return cls(
+            lemma=data.get("lemma", ""),
+            attempts=data.get("attempts", 0),
+            correct=data.get("correct", 0),
+            accuracy=data.get("accuracy", 0.0),
+            known_status=data.get("known_status", "new"),
+        )
+
+
+@dataclass
+class PersonalExample:
+    lemma: str
+    sentence: str
+    translation: str
+    source: str = "llm"              # "llm" | "book"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "PersonalExample":
+        return cls(
+            lemma=data.get("lemma", ""),
+            sentence=data.get("sentence", ""),
+            translation=data.get("translation", ""),
+            source=data.get("source", "llm"),
+        )
+
+
+@dataclass
+class UserProgress:
+    """Everything that is personal. Saved to data/users/<user_id>/progress.json.
+
+    Note: `chapter_scores`, `word_knowledge`, `personal_examples` are all keyed
+    by lemma / chapter_id and are updated *by the mastery layer*, never by
+    the book builder.
+    """
+    user_id: str
+    native_language: str = "en"
+    active_book_ids: list[str] = field(default_factory=list)
+    chapter_scores: dict[str, ChapterScore] = field(default_factory=dict)
+    word_knowledge: dict[str, WordKnowledge] = field(default_factory=dict)
+    personal_examples: dict[str, list[PersonalExample]] = field(default_factory=dict)
+    updated_at: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "user_id": self.user_id,
+            "native_language": self.native_language,
+            "active_book_ids": list(self.active_book_ids),
+            "chapter_scores": {k: v.to_dict() for k, v in self.chapter_scores.items()},
+            "word_knowledge": {k: v.to_dict() for k, v in self.word_knowledge.items()},
+            "personal_examples": {
+                k: [e.to_dict() for e in v]
+                for k, v in self.personal_examples.items()
+            },
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "UserProgress":
+        return cls(
+            user_id=data.get("user_id", ""),
+            native_language=data.get("native_language", "en"),
+            active_book_ids=list(data.get("active_book_ids", [])),
+            chapter_scores={
+                k: ChapterScore.from_dict(v)
+                for k, v in data.get("chapter_scores", {}).items()
+            },
+            word_knowledge={
+                k: WordKnowledge.from_dict(v)
+                for k, v in data.get("word_knowledge", {}).items()
+            },
+            personal_examples={
+                k: [PersonalExample.from_dict(e) for e in v]
+                for k, v in data.get("personal_examples", {}).items()
+            },
+            updated_at=data.get("updated_at", ""),
         )
