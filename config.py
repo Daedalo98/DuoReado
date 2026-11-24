@@ -1,49 +1,43 @@
-"""
-config.py
-Central configuration for file paths, Ollama settings, and learning thresholds.
-"""
-
+""" config.py — central configuration for file paths, Ollama, thresholds. """
 from pathlib import Path
 
-# Base project directory
 BASE_DIR = Path(__file__).resolve().parent
-
-# Where imported books (.json), exported clean texts (.txt), and AI caches live
 DATA_DIR = BASE_DIR / "data"
-BOOKS_DIR = DATA_DIR / "books"
-TEXTS_DIR = DATA_DIR / "texts"
-CACHE_DIR = DATA_DIR / "cache"
-GRANTED_ES_PATH = Path(__file__).resolve().parent / "spanish" / "granted_es.json"
 
+# --- Ingestion roots -------------------------------------------------------
+PDFS_DIR    = DATA_DIR / "pdfs"       # ← NEW: drop PDFs here
+BOOKS_DIR   = DATA_DIR / "books"      # generated vocabulary JSON
+GRANTED_DIR = DATA_DIR / "granted"    # ← NEW: granted_es.json, granted_fr.json, ...
+USERS_DIR   = DATA_DIR / "users"      # ← NEW: per-user progress
+CACHE_DIR   = DATA_DIR / "cache"      # Ollama response cache
 
-# Default Ollama server settings
+# Legacy folder kept only so old .txt exports do not break; nothing reads it.
+TEXTS_DIR   = DATA_DIR / "texts"
+
+# Default language when the filename gives no hint (e.g. "don_quijote.pdf").
+DEFAULT_LANGUAGE = "es"
+
+# How many book sentences to keep per word (used by the quiz + reader).
+MAX_SENTENCES_PER_WORD = 5
+
+# Ollama
 OLLAMA_BASE_URL = "http://localhost:11434"
 DEFAULT_MODEL = "granite4.2:3b"
 DECISION_MODEL = "tev1:4b"
 OLLAMA_TIMEOUT_SECONDS = 180
 
-DEFAULT_BATCH_SIZE = 10
-DEFAULT_SENTENCES_PER_WORD = 4
-
-# Optional spaCy model names by 2-letter language code.
-# If spaCy or the language model isn't installed, text_normalizer gracefully
-# falls back to a clean regex/lowercase normalizer.
+# spaCy models by 2-letter language code
 SPACY_MODELS = {
-    "en": "en_core_web_sm",
-    "it": "it_core_news_sm",
-    "es": "es_core_news_sm",
-    "fr": "fr_core_news_sm",
-    "de": "de_core_news_sm",
-    "pt": "pt_core_news_sm",
+    "en": "en_core_web_sm", "it": "it_core_news_sm", "es": "es_core_news_sm",
+    "fr": "fr_core_news_sm", "de": "de_core_news_sm", "pt": "pt_core_news_sm",
 }
 
-# Mastery & Chapter Readiness thresholds
+# Mastery / readiness thresholds
 MASTERED_MIN_ATTEMPTS = 3
-MASTERED_MIN_ACCURACY = 0.80       # 80%+ accuracy across >= 3 attempts
-CHAPTER_READINESS_TARGET = 0.90    # 90% of chapter words known/mastered unlocks "smooth reading"
+MASTERED_MIN_ACCURACY = 0.80
+CHAPTER_READINESS_TARGET = 0.90
 
 
 def ensure_directories() -> None:
-    """Create data directories if they do not exist yet."""
-    for folder in (DATA_DIR, BOOKS_DIR, TEXTS_DIR, CACHE_DIR):
+    for folder in (DATA_DIR, PDFS_DIR, BOOKS_DIR, GRANTED_DIR, USERS_DIR, CACHE_DIR):
         folder.mkdir(parents=True, exist_ok=True)

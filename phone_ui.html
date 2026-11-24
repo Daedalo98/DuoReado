@@ -174,6 +174,7 @@
   <button data-view="practice" class="active">Practice</button>
   <button data-view="progress">Progress</button>
   <button data-view="setup">Setup</button>
+  <button data-view="library">Library</button>
 </nav>
 
 <main>
@@ -221,6 +222,25 @@
       Load a book to see per-chapter progress.
     </div>
     <div id="progress-list"></div>
+  </section>
+
+  <!-- ============================== LIBRARY ============================= -->
+  <section id="view-library" class="view">
+    <div class="card">
+      <h2>PDF folder</h2>
+      <p style="color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 12px">
+        Drop PDFs into <code>data/pdfs/</code> on the PC, or upload from this device.
+        Name them <code>title_es.pdf</code> (or add a <code>.pdf.meta.json</code>
+        sidecar) so the language is detected.
+      </p>
+
+      <input type="file" id="lib-file" accept="application/pdf" style="display:none">
+      <button id="lib-upload" class="ghost">Upload a PDF from this device</button>
+      <button id="lib-scan" class="primary">Scan folder &amp; ingest all</button>
+
+      <div id="lib-list" style="margin-top:14px"></div>
+      <div class="feedback" id="lib-feedback"></div>
+    </div>
   </section>
 
   <!-- ============================== SETUP =============================== -->
@@ -293,6 +313,88 @@
       $(`view-${btn.dataset.view}`).classList.add("active");
       if (btn.dataset.view === "progress") loadProgress();
     });
+  });
+    
+  // inside the IIFE, after the existing tab wiring
+  async function loadPdfs() {
+    try {
+      const data = await apiGet("/api/pdfs");
+      const list = $("lib-list");
+      if (!data.pdfs.length) {
+        list.innerHTML = '<div class="empty">No PDFs in data/pdfs/ yet.</div>';
+        return;
+      }
+      list.innerHTML = data.pdfs.map(p => `
+        <div class="card" style="padding:12px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+            <div>
+              <div style="font-weight:600">${escapeHtml(p.name)}</div>
+              <div style="font-size:12px;color:var(--muted)">
+                ${p.size_kb} KB · ${escapeHtml(p.language)}
+                ${p.ingested ? '· <span style="color:var(--accent)">ingested</span>' : ''}
+              </div>
+            </div>
+            <button class="ghost" style="width:auto;padding:8px 12px"
+                    data-ingest="${escapeHtml(p.name)}">
+              ${p.ingested ? "Rebuild" : "Ingest"}
+            </button>
+          </div>
+        </div>`).join("");
+
+      list.querySelectorAll("button[data-ingest]").forEach(btn => {
+        btn.addEventListener("click", () => ingestOne(btn.dataset.ingest, true));
+      });
+    } catch (err) {
+      $("lib-feedback").textContent = `Error: ${err.message}`;
+    }
+  }
+
+  async function ingestOne(name, force) {
+    $("lib-feedback").textContent = `Ingesting ${name}…`;
+    try {
+      const res = await apiPost("/api/ingest", { filename: name, force });
+      $("lib-feedback").textContent = `Done: ${res.result.book_id} — ${res.result.words} words.`;
+      await loadPdfs();
+      await loadBooks();          // refresh the Setup dropdown
+    } catch (err) {
+      $("lib-feedback").textContent = `Error: ${err.message}`;
+    }
+  }
+
+  async function ingestAll() {
+    $("lib-feedback").textContent = "Scanning data/pdfs/…";
+    try {
+      const res = await apiPost("/api/ingest", {});
+      const ok = res.result.filter(r => r.ok).length;
+      $("lib-feedback").textContent = `Ingested ${ok}/${res.result.length} PDFs.`;
+      await loadPdfs();
+      await loadBooks();
+    } catch (err) {
+      $("lib-feedback").textContent = `Error: ${err.message}`;
+    }
+  }
+
+  $("lib-scan").addEventListener("click", ingestAll);
+  $("lib-upload").addEventListener("click", () => $("lib-file").click());
+  $("lib-file").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    $("lib-feedback").textContent = `Uploading ${file.name}…`;
+    try {
+      const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/pdf" },
+        body: file,
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.error || res.statusText);
+      $("lib-feedback").textContent = "Uploaded. Ingesting…";
+      await ingestOne(file.name, true);
+    } catch (err) {
+      $("lib-feedback").textContent = `Upload failed: ${err.message}`;
+    } finally {
+      e.target.value = "";
+    }
   });
 
   // --------------------------------------------------------- setup: books

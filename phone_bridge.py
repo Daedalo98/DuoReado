@@ -44,6 +44,11 @@ from learning import mastery
 from learning.user_store import load_user_progress, save_user_progress
 from models.schemas import BookIndex, ChapterInfo, UserProgress, VocabularyEntry
 
+from ingestion.loader import (
+    book_id_for_pdf, discover_pdfs, infer_language, ingest_folder, ingest_pdf, is_ingested,
+)
+from config import PDFS_DIR
+
 BASE_DIR = Path(__file__).resolve().parent
 UI_HTML_PATH = BASE_DIR / "phone_ui.html"
 
@@ -214,6 +219,13 @@ class BridgeState:
             self.log(f"Skipped {lemma}")
             return wk.to_dict()
 
+    def mark_word_known(self, lemma: str) -> dict[str, Any]:
+        with self.lock:
+            wk = mastery.mark_word_known(self.progress, lemma)
+            save_user_progress(self.progress)
+            self.log(f"Marked {lemma} as known")
+            return wk.to_dict()
+
     def enrich(self, lemma: str) -> bool:
         with self.lock:
             if self.book is None:
@@ -232,6 +244,45 @@ class BridgeState:
                 save_book_index(self.book)
                 self.log(f"Enriched {lemma}")
             return changed
+
+    def list_pdfs(self) -> list[dict]:
+        out = []
+        for pdf in discover_pdfs():
+            out.append({
+                "name": pdf.name,
+                "book_id": book_id_for_pdf(pdf),
+                "language": infer_language(pdf),
+                "ingested": is_ingested(pdf),
+                "size_kb": round(pdf.stat().st_size / 1024, 1),
+            })
+        return out
+
+    def ingest_one(self, filename: str, language: str | None = None, force: bool = False) -> dict:
+        pdf = PDFS_DIR / Path(filename).name
+        if not pdf.exists():
+            raise ValueError(f"PDF not found: {filename}")
+        book = ingest_pdf(
+            pdf, language=language, force=force,
+            on_progress=lambda s, c, t: self.log(f"ingest {s} ({c}/{t})"),
+        )
+        self.log(f"Ingested {book.book_id}: {len(book.words)} words")
+        return {"book_id": book.book_id, "words": len(book.words), "chapters": len(book.chapters)}
+
+    def ingest_all(self, force: bool = False) -> list[dict]:
+        return ingest_folder(force=force,
+                            on_progress=lambda s, c, t: self.log(f"scan {s} ({c}/{t})"))
+
+    def save_upload(self, filename: str, data: bytes) -> dict:
+        safe = Path(filename).name
+        if not safe.lower().endswith(".pdf"):
+            raise ValueError("Only .pdf files are accepted")
+        if not data:
+            raise ValueError("Empty upload")
+        PDFS_DIR.mkdir(parents=True, exist_ok=True)
+        target = PDFS_DIR / safe
+        target.write_bytes(data)
+        self.log(f"Uploaded {safe} ({len(data)} bytes)")
+        return {"name": safe, "size": len(data)}
 
 
 # ---------------------------------------------------------------------------
@@ -305,6 +356,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 lemma = path[len("/api/word/"):]
                 self._send(200, {"ok": True, "word": STATE.word_detail(lemma)})
                 return
+            
+            if path == "/api/pdfs":
+                self._send(200, {"ok": True, "pdfs": STATE.list_pdfs()})
+                return
 
             self._err(404, f"Unknown path: {path}")
         except Exception as exc:
@@ -344,6 +399,25 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 lemma = path[len("/api/word/"):-len("/enrich")]
                 changed = STATE.enrich(lemma)
                 self._send(200, {"ok": True, "enriched": changed})
+                return
+
+            if path == "/api/ingest":
+                body = self._read_json()
+                filename = body.get("filename")
+                if filename:
+                    result = STATE.ingest_one(filename, body.get("language"), bool(body.get("force")))
+                else:
+                    result = STATE.ingest_all(bool(body.get("force")))
+                self._send(200, {"ok": True, "result": result})
+                return
+
+            if path == "/api/upload":
+                # raw-body upload: Content-Type: application/pdf, ?name=<filename>
+                from urllib.parse import parse_qs
+                name = (parse_qs(urlparse(self.path).query).get("name") or [""])[0]
+                length = int(self.headers.get("Content-Length", 0))
+                data = self.rfile.read(length) if length else b""
+                self._send(200, {"ok": True, "upload": STATE.save_upload(name, data)})
                 return
 
             self._err(404, f"Unknown path: {path}")
