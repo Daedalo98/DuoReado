@@ -1,0 +1,125 @@
+{
+  "articles": {
+    "definite": ["el", "la", "los", "las"],
+    "neuter": ["lo"],
+    "indefinite": ["un", "una", "unos", "unas"]
+  },
+  "contractions": {
+    "mandatory": ["al", "del"],
+    "prepositional_pronouns": ["conmigo", "contigo", "consigo"]
+  },
+  "prepositions": {
+    "simple_rae": [
+      "a", "ante", "bajo", "cabe", "con", "contra", "de", "desde",
+      "durante", "en", "entre", "hacia", "hasta", "mediante", "para",
+      "por", "según", "sin", "so", "sobre", "tras", "versus", "vía"
+    ],
+    "prepositional_equivalents": [
+      "excepto", "incluso", "salvo", "menos", "pro"
+    ]
+  },
+  "pronouns": {
+    "subject": [
+      "yo", "tú", "vos", "él", "ella", "usted",
+      "nosotros", "nosotras", "vosotros", "vosotras",
+      "ellos", "ellas", "ustedes", "ello"
+    ],
+    "direct_object": [
+      "me", "te", "lo", "la", "nos", "os", "los", "las"
+    ],
+    "indirect_object": [
+      "me", "te", "le", "se", "nos", "os", "les"
+    ],
+    "reflexive": [
+      "me", "te", "se", "nos", "os"
+    ],
+    "prepositional_terminal": [
+      "mí", "ti", "vos", "él", "ella", "usted", "sí",
+      "nosotros", "nosotras", "vosotros", "vosotras",
+      "ellos", "ellas", "ustedes", "ello"
+    ],
+    "possessive_unstressed": [
+      "mi", "mis", "tu", "tus", "su", "sus",
+      "nuestro", "nuestra", "nuestros", "nuestras",
+      "vuestro", "vuestra", "vuestros", "vuestras"
+    ],
+    "possessive_stressed": [
+      "mío", "mía", "míos", "mías",
+      "tuyo", "tuya", "tuyos", "tuyas",
+      "suyo", "suya", "suyos", "suyas"
+    ],
+    "demonstrative": [
+      "este", "esta", "estos", "estas", "esto",
+      "ese", "esa", "esos", "esas", "eso",
+      "aquel", "aquella", "aquellos", "aquellas", "aquello",
+      "éste", "ésta", "éstos", "éstas",
+      "ése", "ésa", "ésos", "ésas",
+      "aquél", "aquélla", "aquéllos", "aquéllas"
+    ],
+    "relative": [
+      "que", "quien", "quienes",
+      "cual", "cuales",
+      "cuyo", "cuya", "cuyos", "cuyas",
+      "cuanto", "cuanta", "cuantos", "cuantas",
+      "donde", "adonde", "cuando", "como"
+    ],
+    "interrogative_and_exclamative": [
+      "qué", "quién", "quiénes",
+      "cuál", "cuáles",
+      "cuánto", "cuánta", "cuántos", "cuántas",
+      "dónde", "adónde", "cuándo", "cómo", "por qué"
+    ],
+    "indefinite": [
+      "algo", "alguien", "alguno", "alguna", "algunos", "algunas", "algún",
+      "nada", "nadie", "ninguno", "ninguna", "ningunos", "ningunas", "ningún",
+      "todo", "toda", "todos", "todas",
+      "otro", "otra", "otros", "otras",
+      "mismo", "misma", "mismos", "mismas",
+      "mucho", "mucha", "muchos", "muchas",
+      "poco", "poca", "pocos", "pocas",
+      "tanto", "tanta", "tantos", "tantas",
+      "varios", "varias",
+      "demás", "cada", "cualquier", "cualquiera", "cualesquiera",
+      "quienquiera", "quienesquiera", "ambos", "ambas", "tal", "tales"
+    ]
+  },
+  "conjunctions_and_connectors": {
+    "coordinating": [
+      "y", "e", "ni", "o", "u",
+      "pero", "mas", "sino", "aunque", "sin embargo"
+    ],
+    "subordinating": [
+      "que", "si", "porque", "pues", "puesto que", "ya que",
+      "como", "mientras", "apenas", "luego", "conque", "así que"
+    ]
+  },
+  "core_particles_and_adverbs": {
+    "polarity_and_basic": [
+      "sí", "no", "ya", "aún", "aun", "también", "tampoco",
+      "muy", "más", "menos", "tan", "solo", "sólo", "bien", "mal"
+    ],
+    "place_and_time_pointers": [
+      "aquí", "acá", "ahí", "allí", "allá",
+      "ahora", "hoy", "ayer", "mañana", "entonces", "siempre", "nunca", "jamás"
+    ]
+  },
+  "accented_homonym_pairs": [
+    { "unaccented": "el", "accented": "él", "note": "article vs. pronoun (he/him)" },
+    { "unaccented": "tu", "accented": "tú", "note": "possessive vs. subject pronoun (you)" },
+    { "unaccented": "mi", "accented": "mí", "note": "possessive vs. prepositional pronoun (me)" },
+    { "unaccented": "si", "accented": "sí", "note": "conjunction (if) vs. affirmative/pronoun (yes/oneself)" },
+    { "unaccented": "se", "accented": "sé", "note": "pronoun vs. verb form (saber/ser)" },
+    { "unaccented": "de", "accented": "dé", "note": "preposition vs. verb form (dar)" },
+    { "unaccented": "te", "accented": "té", "note": "pronoun vs. noun (tea)" },
+    { "unaccented": "mas", "accented": "más", "note": "conjunction (but) vs. adverb/quantifier (more)" },
+    { "unaccented": "aun", "accented": "aún", "note": "even vs. still/yet" },
+    { "unaccented": "solo", "accented": "sólo", "note": "adjective (alone) vs. adverb (only, legacy tilde)" },
+    { "unaccented": "que", "accented": "qué", "note": "relative/conjunction vs. interrogative" },
+    { "unaccented": "quien", "accented": "quién", "note": "relative vs. interrogative" },
+    { "unaccented": "cual", "accented": "cuál", "note": "relative vs. interrogative" },
+    { "unaccented": "como", "accented": "cómo", "note": "conjunction/verb vs. interrogative" },
+    { "unaccented": "cuando", "accented": "cuándo", "note": "conjunction vs. interrogative" },
+    { "unaccented": "donde", "accented": "dónde", "note": "relative vs. interrogative" },
+    { "unaccented": "cuanto", "accented": "cuánto", "note": "relative vs. interrogative" }
+  ]
+}
