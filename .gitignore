@@ -1,4 +1,6 @@
-./data/
+# Ignore the following files and directories
 
-./.venv/
+.venv/
+data/
+/home/daedalo/DuoReado/data
 
