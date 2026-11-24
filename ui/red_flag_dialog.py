@@ -1,99 +1,181 @@
-"""
-ui/red_flag_dialog.py
-Modal JSON inspector & editor ("Red Flag") for manually fixing or enriching a WordEntry.
-"""
+"""ui/red_flag_dialog.py
 
+Modal JSON inspector & editor ("Red Flag") for manually fixing or
+enriching a VocabularyEntry.
+
+Two layers:
+    RedFlagEditor  — pure logic: load JSON, validate shape, apply, save.
+                     Framework-agnostic; unit-testable.
+    RedFlagDialog  — Tkinter (customtkinter-compatible) shell around it.
+
+The dialog **does not** touch user progress. It only mutates the shared
+book JSON via the caller-supplied `on_save(entry)` callback — so persistence
+is the caller's job (usually `save_book_index(book)`).
+"""
 from __future__ import annotations
 
 import json
 import tkinter as tk
-from tkinter import messagebox, ttk
-from typing import Callable
+from dataclasses import asdict
+from tkinter import messagebox
+from typing import Any, Callable
 
-from models.schemas import WordEntry
+from models.schemas import VocabularyEntry
 
 
-class RedFlagWordDialog(tk.Toplevel):
+# ---------------------------------------------------------------------------
+# 1. Pure logic layer
+# ---------------------------------------------------------------------------
+
+class RedFlagEditor:
+    """Load, validate and apply JSON edits for a single VocabularyEntry."""
+
+    # Fields the user must never edit through this dialog (they are derived).
+    _READ_ONLY_KEYS = {"occurrences", "first_chapter", "sentences"}
+
+    def __init__(self, entry: VocabularyEntry, on_save: Callable[[VocabularyEntry], None]):
+        self._original = entry
+        self._on_save = on_save
+
+    # -- JSON round-trip ----------------------------------------------------
+
+    def to_json_text(self) -> str:
+        """Pretty JSON for the text widget. Read-only fields are removed
+        because they belong to the build phase, not to manual enrichment."""
+        payload = asdict(self._original)
+        for key in self._READ_ONLY_KEYS:
+            payload.pop(key, None)
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    def apply_json_text(self, text: str) -> VocabularyEntry:
+        """Parse and validate. Raise ValueError on bad input.
+
+        Only the *enrichable* fields are taken from the text:
+            entries, linguistics, semantic_keywords
+        The build-time fields (occurrences, first_chapter, sentences)
+        are preserved from the original entry.
+        """
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSON: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError("Top-level JSON must be an object.")
+
+        # Merge: start from the original (keeps read-only fields) and
+        # override only the editable ones present in the payload.
+        merged = asdict(self._original)
+        for key in ("entries", "linguistics", "semantic_keywords"):
+            if key in parsed:
+                merged[key] = parsed[key]
+
+        # Validate the shape via the schema's from_dict — bad shapes raise.
+        try:
+            new_entry = VocabularyEntry.from_dict(merged)
+        except (TypeError, KeyError) as exc:
+            raise ValueError(f"Schema mismatch: {exc}") from exc
+
+        return new_entry
+
+    def save_from_text(self, text: str) -> VocabularyEntry:
+        new_entry = self.apply_json_text(text)
+        self._on_save(new_entry)
+        return new_entry
+
+
+# ---------------------------------------------------------------------------
+# 2. Tkinter shell
+# ---------------------------------------------------------------------------
+
+class RedFlagDialog(tk.Toplevel):
+    """Modal window. Opens, edits, and calls on_save exactly once."""
+
     def __init__(
         self,
-        parent: tk.Misc,
-        word_entry: WordEntry,
-        on_save: Callable[[WordEntry], None],
+        master: tk.Misc,
+        entry: VocabularyEntry,
+        on_save: Callable[[VocabularyEntry], None],
+        title: str = "Red Flag — Edit Word Entry",
     ) -> None:
-        super().__init__(parent)
-        self.title(f"🚩 Red Flag — Inspect / Edit JSON: '{word_entry.lemma}'")
-        self.geometry("760x560")
-        self.transient(parent)
-        self.grab_set()
+        super().__init__(master)
+        self.title(title)
+        self.geometry("640x520")
+        self.minsize(480, 400)
+        self.transient(master)
+        self.grab_set()                       # modal
 
-        self.word_entry = word_entry
-        self.on_save = on_save
+        self._editor = RedFlagEditor(entry, on_save)
+        self._build_widgets()
+        self._load_into_text()
 
-        self._build_ui()
-        self._load_json()
+    def _build_widgets(self) -> None:
+        header = tk.Frame(self)
+        header.pack(fill="x", padx=10, pady=(10, 4))
+        tk.Label(
+            header,
+            text="Edit enrichment fields only. Build-time fields "
+                 "(occurrences, first_chapter, sentences) are ignored.",
+            anchor="w", justify="left", fg="#8b94b3",
+        ).pack(fill="x")
 
-    def _build_ui(self) -> None:
-        pad = ttk.Frame(self, padding=12)
-        pad.pack(fill="both", expand=True)
+        body = tk.Frame(self)
+        body.pack(fill="both", expand=True, padx=10, pady=4)
 
-        ttk.Label(
-            pad,
-            text=(
-                f"Editing source JSON for lemma '{self.word_entry.lemma}'. "
-                "Modify translations, false friends, edge meanings, sentences, or stats, then click Save."
-            ),
-            wraplength=720,
-        ).pack(anchor="w", pady=(0, 8))
+        scrollbar = tk.Scrollbar(body)
+        scrollbar.pack(side="right", fill="y")
 
-        text_frame = ttk.Frame(pad)
-        text_frame.pack(fill="both", expand=True)
+        self._text = tk.Text(
+            body, wrap="none", undo=True,
+            font=("Menlo", 12), yscrollcommand=scrollbar.set,
+        )
+        self._text.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=self._text.yview)
 
-        self.editor = tk.Text(text_frame, wrap="none", font=("Consolas", 10), undo=True)
-        y_scroll = ttk.Scrollbar(text_frame, orient="vertical", command=self.editor.yview)
-        x_scroll = ttk.Scrollbar(text_frame, orient="horizontal", command=self.editor.xview)
-        self.editor.configure(yscrollcommand=y_scroll.set, xscrollcommand=x_scroll.set)
+        footer = tk.Frame(self)
+        footer.pack(fill="x", padx=10, pady=(4, 10))
+        tk.Button(footer, text="Cancel", command=self.destroy).pack(side="right")
+        tk.Button(footer, text="Save", command=self._on_save_clicked).pack(
+            side="right", padx=(0, 8)
+        )
+        tk.Button(footer, text="Reformat", command=self._on_reformat).pack(
+            side="left"
+        )
 
-        self.editor.grid(row=0, column=0, sticky="nsew")
-        y_scroll.grid(row=0, column=1, sticky="ns")
-        x_scroll.grid(row=1, column=0, sticky="ew")
-        text_frame.rowconfigure(0, weight=1)
-        text_frame.columnconfigure(0, weight=1)
+    # -- actions ------------------------------------------------------------
 
-        btn_bar = ttk.Frame(pad)
-        btn_bar.pack(fill="x", pady=(10, 0))
+    def _load_into_text(self) -> None:
+        self._text.delete("1.0", "end")
+        self._text.insert("1.0", self._editor.to_json_text())
 
-        ttk.Button(btn_bar, text="Format JSON", command=self._format_json).pack(side="left", padx=(0, 6))
-        ttk.Button(btn_bar, text="Reset Original", command=self._load_json).pack(side="left")
-        ttk.Button(btn_bar, text="Cancel", command=self.destroy).pack(side="right", padx=(6, 0))
-        ttk.Button(btn_bar, text="Save Word JSON", command=self._save).pack(side="right")
-
-    def _load_json(self) -> None:
-        formatted = json.dumps(self.word_entry.to_dict(), indent=2, ensure_ascii=False)
-        self.editor.delete("1.0", "end")
-        self.editor.insert("1.0", formatted)
-
-    def _format_json(self) -> None:
-        raw = self.editor.get("1.0", "end-1c")
+    def _on_reformat(self) -> None:
+        """Re-indent the current text without validating the schema."""
+        raw = self._text.get("1.0", "end").strip()
         try:
-            parsed = json.loads(raw)
+            pretty = json.dumps(json.loads(raw), ensure_ascii=False, indent=2)
         except json.JSONDecodeError as exc:
-            messagebox.showerror("Invalid JSON", f"Cannot format invalid JSON:\n{exc}", parent=self)
+            messagebox.showerror("JSON error", str(exc), parent=self)
             return
-        self.editor.delete("1.0", "end")
-        self.editor.insert("1.0", json.dumps(parsed, indent=2, ensure_ascii=False))
+        self._text.delete("1.0", "end")
+        self._text.insert("1.0", pretty)
 
-    def _save(self) -> None:
-        raw = self.editor.get("1.0", "end-1c")
+    def _on_save_clicked(self) -> None:
+        raw = self._text.get("1.0", "end")
         try:
-            parsed = json.loads(raw)
-            if not isinstance(parsed, dict):
-                raise ValueError("Top-level word entry must be a JSON object.")
-            # Preserve lemma key consistency if user edited inside object
-            parsed.setdefault("lemma", self.word_entry.lemma)
-            updated_entry = WordEntry.from_dict(parsed)
-        except Exception as exc:
-            messagebox.showerror("Validation Error", f"Could not save changes:\n{exc}", parent=self)
+            self._editor.save_from_text(raw)
+        except ValueError as exc:
+            messagebox.showerror("Cannot save", str(exc), parent=self)
             return
-
-        self.on_save(updated_entry)
         self.destroy()
+
+
+# ---------------------------------------------------------------------------
+# 3. Convenience opener
+# ---------------------------------------------------------------------------
+
+def open_red_flag_dialog(
+    master: tk.Misc,
+    entry: VocabularyEntry,
+    on_save: Callable[[VocabularyEntry], None],
+) -> RedFlagDialog:
+    """Create and return the dialog (caller may wait_window if desired)."""
+    return RedFlagDialog(master, entry, on_save)

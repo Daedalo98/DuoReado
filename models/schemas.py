@@ -105,13 +105,9 @@ class WordLinguistics:
 
 @dataclass
 class VocabularyEntry:
-    """The per-word record. Filled **in two phases**:
-
-    Phase 1 (build, cheap):   occurrences + first_chapter
-    Phase 2 (enrich, Ollama): entries + linguistics + semantic_keywords
-    """
     occurrences: int = 0
     first_chapter: int = 0
+    sentences: list[Occurrence] = field(default_factory=list)   # ← NEW
     entries: list[WordFormEntry] = field(default_factory=list)
     linguistics: WordLinguistics = field(default_factory=WordLinguistics)
     semantic_keywords: list[str] = field(default_factory=list)
@@ -120,6 +116,7 @@ class VocabularyEntry:
         return {
             "occurrences": self.occurrences,
             "first_chapter": self.first_chapter,
+            "sentences": [asdict(s) for s in self.sentences],   # ← NEW
             "entries": [e.to_dict() for e in self.entries],
             "linguistics": self.linguistics.to_dict(),
             "semantic_keywords": list(self.semantic_keywords),
@@ -130,11 +127,11 @@ class VocabularyEntry:
         return cls(
             occurrences=data.get("occurrences", 0),
             first_chapter=data.get("first_chapter", 0),
+            sentences=[Occurrence(**s) for s in data.get("sentences", [])],   # ← NEW
             entries=[WordFormEntry.from_dict(e) for e in data.get("entries", [])],
             linguistics=WordLinguistics.from_dict(data.get("linguistics", {})),
             semantic_keywords=list(data.get("semantic_keywords", [])),
         )
-
 
 @dataclass
 class BookIndex:

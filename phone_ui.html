@@ -1,815 +1,648 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Book Language Trainer — Game Arena</title>
-  <style>
-    :root {
-      --bg: #090d16;
-      --surface: #111827;
-      --surface-2: #1f2937;
-      --border: #334155;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --cyan: #22d3ee;
-      --cyan-dark: #083344;
-      --green: #22c55e;
-      --red: #ef4444;
-      --amber: #f59e0b;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DuoReado</title>
+<style>
+  :root {
+    --bg: #0f1220;
+    --card: #1a1f36;
+    --card-hi: #232a47;
+    --text: #eef1fa;
+    --muted: #8b94b3;
+    --accent: #4ecca3;
+    --danger: #e94560;
+    --warn: #f7b731;
+    --border: #2b3355;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  body { padding-bottom: env(safe-area-inset-bottom); }
 
-    * { box-sizing: border-box; }
+  header {
+    padding: 16px 18px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+  #status { font-size: 12px; color: var(--muted); }
+  #status.online  { color: var(--accent); }
+  #status.offline { color: var(--danger); }
 
-    body {
-      margin: 0;
-      padding: 12px 12px 72px 12px;
-      font-family: system-ui, -apple-system, Roboto, sans-serif;
-      background: radial-gradient(circle at top, #131c31 0%, var(--bg) 65%);
-      color: var(--text);
-      font-size: 16px;
-      line-height: 1.4;
-    }
+  nav {
+    display: flex; gap: 4px; padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 57px; background: var(--bg); z-index: 4;
+  }
+  nav button {
+    flex: 1; padding: 10px; border-radius: 10px;
+    background: transparent; color: var(--muted);
+    border: 1px solid transparent; font-size: 14px; font-weight: 500;
+    cursor: pointer;
+  }
+  nav button.active {
+    background: var(--card); color: var(--text);
+    border-color: var(--border);
+  }
 
-    .panel {
-      background: rgba(17, 24, 39, 0.92);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 14px;
-      margin-bottom: 12px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
-    }
+  main { padding: 16px; max-width: 640px; margin: 0 auto; }
+  .view { display: none; }
+  .view.active { display: block; }
 
-    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .col { flex: 1 1 140px; }
-    .col-sm { flex: 0 0 92px; }
+  .card {
+    background: var(--card); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 12px;
+    border: 1px solid var(--border);
+  }
 
-    label.lbl {
-      display: block;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }
+  h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted);
+       text-transform: uppercase; letter-spacing: .8px; font-weight: 600; }
 
-    select, input[type="number"], input[type="text"], textarea {
-      width: 100%;
-      padding: 11px 12px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: #070b12;
-      color: var(--text);
-      font-size: 15px;
-    }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 6px; }
+  select, input {
+    width: 100%; padding: 12px; font-size: 16px;
+    background: var(--card-hi); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px;
+    appearance: none;
+  }
 
-    button {
-      min-height: 48px;
-      padding: 10px 14px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--surface-2);
-      color: var(--text);
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      touch-action: manipulation;
-      transition: transform 0.1s ease, background 0.15s ease, border-color 0.15s ease;
-    }
+  button.primary, button.ghost, button.danger {
+    width: 100%; padding: 14px; font-size: 16px;
+    border-radius: 12px; border: none; font-weight: 600;
+    cursor: pointer; margin-top: 10px;
+  }
+  button.primary { background: var(--accent); color: #051b15; }
+  button.danger  { background: var(--danger); color: #fff; }
+  button.ghost   { background: var(--card-hi); color: var(--text);
+                   border: 1px solid var(--border); }
+  button:disabled { opacity: .45; cursor: default; }
 
-    button:active { transform: scale(0.97); }
+  .row { display: flex; gap: 8px; margin-top: 10px; }
+  .row > button { margin-top: 0; flex: 1; }
 
-    button.launch {
-      background: linear-gradient(135deg, #06b6d4, #3b82f6);
-      color: #ffffff;
-      border: none;
-    }
+  /* --- Practice card --- */
+  .word {
+    font-size: 34px; font-weight: 700; text-align: center;
+    margin: 8px 0 4px; word-break: break-word;
+  }
+  .word-meta { text-align: center; color: var(--muted); font-size: 13px; }
+  .bar {
+    height: 6px; background: var(--card-hi); border-radius: 3px;
+    overflow: hidden; margin-top: 10px;
+  }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
 
-    button.danger {
-      background: rgba(239, 68, 68, 0.15);
-      border-color: var(--red);
-      color: #fca5a5;
-    }
+  .reveal { margin-top: 16px; }
+  .reveal.hidden { display: none; }
 
-    .stage-pill {
-      flex: 1;
-      text-align: center;
-      padding: 8px 6px;
-      border-radius: 10px;
-      font-size: 13px;
-      font-weight: 700;
-      background: #0b111e;
-      border: 1px solid var(--border);
-      color: var(--muted);
-    }
+  .translations { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .translations span {
+    background: var(--card-hi); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 999px; font-size: 14px;
+  }
+  .explanation { color: var(--text); line-height: 1.5; font-size: 15px;
+                 margin: 10px 0; }
+  .edge-cases { margin: 8px 0 0; padding-left: 18px; color: var(--muted);
+                font-size: 14px; line-height: 1.5; }
+  .edge-cases li { margin-bottom: 4px; }
 
-    .stage-pill.active {
-      background: var(--cyan-dark);
-      border-color: var(--cyan);
-      color: var(--cyan);
-    }
+  .relation { color: var(--muted); font-size: 12px; }
+  .form-row {
+    display: flex; justify-content: space-between;
+    align-items: baseline; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid var(--border);
+  }
+  .form-row:last-child { border-bottom: none; }
 
-    .bar-track {
-      height: 11px;
-      background: #070b12;
-      border-radius: 999px;
-      overflow: hidden;
-      border: 1px solid #1e293b;
-      margin-top: 6px;
-    }
+  .example {
+    background: var(--card-hi); border-radius: 10px; padding: 10px 12px;
+    margin-top: 8px; font-size: 14px; line-height: 1.5;
+  }
+  .example .tr { color: var(--muted); margin-top: 4px; font-style: italic; }
 
-    .bar-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #22c55e, #22d3ee);
-      transition: width 0.25s ease;
-    }
+  .feedback {
+    text-align: center; color: var(--muted); font-size: 13px;
+    margin-top: 12px; min-height: 18px;
+  }
 
-    /* Exercise 1: Target Word Top + Tactile Tiles Below */
-    .target-banner {
-      text-align: center;
-      padding: 12px;
-      border-radius: 14px;
-      background: linear-gradient(180deg, #17253b 0%, #0d1524 100%);
-      border: 1px solid #2b4366;
-      margin-bottom: 12px;
-    }
+  /* --- Progress --- */
+  .chapter-row { margin-bottom: 14px; }
+  .chapter-head {
+    display: flex; justify-content: space-between;
+    align-items: baseline; margin-bottom: 6px;
+  }
+  .chapter-head .title { font-size: 14px; }
+  .chapter-head .score { font-size: 12px; color: var(--muted); }
+  .readiness-bar { height: 8px; background: var(--card-hi);
+                   border-radius: 4px; overflow: hidden; }
+  .readiness-bar > span { display: block; height: 100%; }
+  .ready  > span { background: var(--accent); }
+  .medium > span { background: var(--warn); }
+  .low    > span { background: var(--danger); }
+  .chapter-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
-    .target-word {
-      font-size: 26px;
-      font-weight: 800;
-      color: var(--cyan);
-      letter-spacing: 0.02em;
-    }
+  .empty { text-align: center; color: var(--muted); padding: 30px 10px;
+           font-size: 15px; line-height: 1.6; }
 
-    .target-sub {
-      font-size: 13px;
-      color: var(--muted);
-      margin-top: 4px;
-    }
-
-    .tiles-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-    }
-
-    .meaning-tile {
-      min-height: 62px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 10px;
-      border-radius: 14px;
-      background: #141e30;
-      border: 1px solid #334155;
-      font-size: 15px;
-      font-weight: 600;
-    }
-
-    @keyframes blinkGreen {
-      0%, 100% { background: #141e30; border-color: var(--green); }
-      45% { background: rgba(34, 197, 94, 0.42); border-color: #86efac; transform: scale(1.03); }
-    }
-
-    @keyframes blinkRed {
-      0%, 100% { background: #141e30; border-color: var(--red); }
-      45% { background: rgba(239, 68, 68, 0.45); border-color: #fca5a5; transform: scale(0.96); }
-    }
-
-    .blink-green { animation: blinkGreen 0.55s ease; }
-    .blink-red { animation: blinkRed 0.55s ease; }
-
-    /* Stage 2: Sentence Completion */
-    .sentence-box {
-      padding: 14px;
-      border-radius: 14px;
-      background: #090e1a;
-      border: 1px solid #273549;
-      font-size: 18px;
-      margin-bottom: 12px;
-    }
-
-    .blank-slot {
-      display: inline-block;
-      min-width: 84px;
-      padding: 2px 10px;
-      border-radius: 8px;
-      border-bottom: 2px solid var(--cyan);
-      background: rgba(34, 211, 238, 0.12);
-      color: var(--cyan);
-      font-weight: 700;
-      transition: all 0.2s ease;
-    }
-
-    .blank-slot.ok {
-      background: rgba(34, 197, 94, 0.28);
-      border-color: var(--green);
-      color: #86efac;
-    }
-
-    .blank-slot.bad {
-      background: rgba(239, 68, 68, 0.28);
-      border-color: var(--red);
-      color: #fca5a5;
-    }
-
-    .chips-wrap {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .word-chip {
-      flex: 1 1 calc(50% - 8px);
-      min-height: 48px;
-    }
-
-    /* Stage 3: Translation & Breakdown Card */
-    .breakdown-card {
-      margin-top: 12px;
-      padding: 12px;
-      border-radius: 12px;
-      background: rgba(245, 158, 11, 0.1);
-      border: 1px solid rgba(245, 158, 11, 0.55);
-      white-space: pre-wrap;
-      font-size: 14px;
-    }
-
-    /* Scoreboard */
-    table.score-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-      margin: 10px 0 14px 0;
-    }
-
-    table.score-table th, table.score-table td {
-      padding: 8px;
-      border-bottom: 1px solid var(--border);
-      text-align: left;
-    }
-
-    .feedback-line {
-      font-size: 14px;
-      color: #e2e8f0;
-      background: #080d17;
-      border: 1px solid #1e293b;
-      border-radius: 12px;
-      padding: 10px;
-      min-height: 44px;
-    }
-
-    .trace-log {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 11.5px;
-      max-height: 150px;
-      overflow-y: auto;
-      background: #070b12;
-      border: 1px solid #1e293b;
-      border-radius: 10px;
-      padding: 8px;
-      white-space: pre-wrap;
-      color: #cbd5e1;
-    }
-
-    /* Red Flag Modal */
-    .modal-bg {
-      position: fixed;
-      inset: 0;
-      background: rgba(2, 6, 23, 0.86);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 12px;
-      z-index: 200;
-    }
-
-    .modal-box {
-      width: 100%;
-      max-width: 640px;
-      max-height: 90vh;
-      overflow-y: auto;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 14px;
-    }
-
-    #rfEditor {
-      min-height: 290px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-    }
-  </style>
+  .pill {
+    display: inline-block; padding: 2px 8px; font-size: 11px;
+    border-radius: 999px; background: var(--card-hi); color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .pill.learning { color: var(--warn); border-color: var(--warn); }
+  .pill.mastered { color: var(--accent); border-color: var(--accent); }
+  .pill.new      { color: var(--muted); }
+  .pill.skipped  { color: #7a7f93; }
+</style>
 </head>
 <body>
 
-  <!-- SCREEN 1: SESSION SETUP -->
-  <div id="setupScreen">
-    <div class="panel">
-      <div style="font-size:20px; font-weight:800; margin-bottom:10px;">Session Setup (PC Engine)</div>
+<header>
+  <h1>DuoReado</h1>
+  <span id="status">connecting…</span>
+</header>
+
+<nav>
+  <button data-view="practice" class="active">Practice</button>
+  <button data-view="progress">Progress</button>
+  <button data-view="setup">Setup</button>
+</nav>
+
+<main>
+
+  <!-- ============================= PRACTICE ============================= -->
+  <section id="view-practice" class="view active">
+    <div id="practice-empty" class="card empty">
+      Pick a book and chapter in <b>Setup</b> to start practising.
+    </div>
+
+    <div id="practice-card" class="card" style="display:none">
+      <div class="word" id="p-word">—</div>
+      <div class="word-meta" id="p-meta"></div>
+      <div class="bar"><span id="p-bar" style="width:0%"></span></div>
+
+      <div id="p-reveal" class="reveal hidden"></div>
 
       <div class="row">
-        <div class="col">
-          <label class="lbl" for="setupBook">Book</label>
-          <select id="setupBook" onchange="syncSetupToServer()"></select>
-        </div>
-        <div class="col">
-          <label class="lbl" for="setupChapter">Chapter</label>
-          <select id="setupChapter" onchange="syncSetupToServer()"></select>
-        </div>
+        <button id="p-reveal-btn" class="ghost">Reveal</button>
       </div>
-
-      <div class="row" style="margin-top:10px;">
-        <div class="col">
-          <label class="lbl" for="setupMainModel">Main Ollama Model</label>
-          <input id="setupMainModel" type="text" onchange="syncSetupToServer()" />
-        </div>
-        <div class="col">
-          <label class="lbl" for="setupDecisionModel">Decision Model</label>
-          <input id="setupDecisionModel" type="text" onchange="syncSetupToServer()" />
-        </div>
+      <div class="row" id="p-assess" style="display:none">
+        <button id="p-bad"  class="danger">I didn't</button>
+        <button id="p-good" class="primary">I knew it</button>
       </div>
-
-      <div class="row" style="margin-top:10px;">
-        <div class="col-sm">
-          <label class="lbl" for="setupN">Words (N)</label>
-          <input id="setupN" type="number" min="1" max="50" value="10" />
-        </div>
-        <div class="col-sm">
-          <label class="lbl" for="setupK">Sents/Word (K)</label>
-          <input id="setupK" type="number" min="1" max="6" value="2" />
-        </div>
-        <div class="col" style="align-self:flex-end;">
-          <button class="launch" style="width:100%;" onclick="launchSession()">Launch Session</button>
-        </div>
-      </div>
-
-      <!-- Enrichment Progress Bar -->
-      <div style="margin-top:14px;">
-        <div id="enrichStatus" style="font-size:13px; color:var(--cyan);">Idle — ready to enrich batch on PC.</div>
-        <div class="bar-track">
-          <div id="enrichBar" class="bar-fill"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SCREEN 2: GAME ARENA -->
-  <div id="arenaScreen" style="display:none;">
-    <div class="panel">
-      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
-        <button style="min-height:38px; padding:6px 12px; font-size:13px;" onclick="switchScreen('setup')">← Setup</button>
-        <div id="arenaChapterTitle" style="font-size:14px; font-weight:700; color:#cbd5e1;"></div>
-        <button class="danger" style="min-height:38px; padding:6px 12px; font-size:13px;" onclick="openRedFlag()">🚩 Red Flag</button>
-      </div>
-
       <div class="row">
-        <div id="pill1" class="stage-pill" onclick="setStage(1)">1. Meaning</div>
-        <div id="pill2" class="stage-pill" onclick="setStage(2)">2. Complete</div>
-        <div id="pill3" class="stage-pill" onclick="setStage(3)">3. Translate</div>
+        <button id="p-skip"   class="ghost">Skip word</button>
+        <button id="p-enrich" class="ghost">Enrich with AI</button>
       </div>
 
-      <div style="margin-top:10px;">
-        <div id="readinessLabel" style="font-size:12.5px; color:var(--muted);">Chapter progress: —</div>
-        <div class="bar-track">
-          <div id="readinessFill" class="bar-fill"></div>
-        </div>
-      </div>
+      <div class="feedback" id="p-feedback"></div>
     </div>
 
-    <div id="stageContainer" class="panel"></div>
-  </div>
-
-  <!-- SHARED FEEDBACK & UNDER-THE-HOOD TRACE -->
-  <div class="panel">
-    <label class="lbl">Status & Feedback</label>
-    <div id="feedbackLine" class="feedback-line"></div>
-
-    <div class="row" style="justify-content:space-between; margin-top:10px; margin-bottom:6px;">
-      <label class="lbl" style="margin:0;">Under-the-Hood Trace</label>
-      <button style="min-height:32px; padding:4px 10px; font-size:12px;" onclick="toggleTrace()">Toggle</button>
+    <div id="practice-done" class="card empty" style="display:none">
+      <div style="font-size:32px">🎉</div>
+      Session complete. Nice work!<br>
+      <button id="p-again" class="primary" style="max-width:220px;margin:16px auto 0">
+        Start another queue
+      </button>
     </div>
-    <div id="traceLog" class="trace-log"></div>
-  </div>
+  </section>
 
-  <!-- RED FLAG JSON MODAL -->
-  <div id="redFlagModal" class="modal-bg">
-    <div class="modal-box">
-      <div style="font-size:17px; font-weight:800; margin-bottom:6px;">🚩 Red Flag — Word JSON Inspector</div>
-      <div style="font-size:13px; color:var(--muted); margin-bottom:8px;">
-        Edit this word's JSON fields directly and save back to the PC book file.
-      </div>
-      <textarea id="rfEditor"></textarea>
-      <div class="row" style="margin-top:10px; justify-content:flex-end;">
-        <button onclick="closeRedFlag()">Cancel</button>
-        <button class="launch" onclick="saveRedFlag()">Save JSON</button>
-      </div>
+  <!-- ============================= PROGRESS ============================= -->
+  <section id="view-progress" class="view">
+    <div id="progress-empty" class="card empty">
+      Load a book to see per-chapter progress.
     </div>
-  </div>
+    <div id="progress-list"></div>
+  </section>
 
-  <script>
-    let latestState = null;
-    let pollTimer = null;
-    let pendingBlink = null; // { index, cls }
+  <!-- ============================== SETUP =============================== -->
+  <section id="view-setup" class="view">
+    <div class="card">
+      <h2>Book</h2>
+      <label for="s-book">Choose a book</label>
+      <select id="s-book"></select>
 
-    function toggleTrace() {
-      const el = document.getElementById("traceLog");
-      el.style.display = el.style.display === "none" ? "block" : "none";
-    }
+      <label for="s-chapter">Chapter number</label>
+      <input id="s-chapter" type="number" min="1" value="1">
 
-    async function postJson(url, body = {}) {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || "Request failed");
-      }
-      return data;
-    }
+      <label for="s-limit">Words in session</label>
+      <input id="s-limit" type="number" min="1" max="100" value="20">
 
-    async function fetchState() {
-      const res = await fetch("/api/state");
-      const data = await res.json();
-      render(data);
-      return data;
-    }
+      <button id="s-start" class="primary" disabled>Load &amp; start</button>
+      <div class="feedback" id="s-feedback"></div>
+    </div>
+  </section>
 
-    function populateSetupInputs(state) {
-      const bookSel = document.getElementById("setupBook");
-      const curBookId = state.book ? state.book.book_id : "";
-      bookSel.innerHTML = "";
-      (state.saved_books || []).forEach((b) => {
-        const op = document.createElement("option");
-        op.value = b.book_id;
-        op.textContent = `${b.title} (${b.language})`;
-        if (b.book_id === curBookId) op.selected = true;
-        bookSel.appendChild(op);
-      });
+</main>
 
-      const chSel = document.getElementById("setupChapter");
-      chSel.innerHTML = "";
-      const chapters = (state.book && state.book.chapters) || [];
-      chapters.forEach((c, idx) => {
-        const op = document.createElement("option");
-        op.value = c.chapter_id;
-        op.textContent = `${idx + 1}. ${c.title}`;
-        if (c.chapter_id === state.chapter_id) op.selected = true;
-        chSel.appendChild(op);
-      });
+<script>
+(() => {
+  // ---------------------------------------------------------------- state
+  const state = {
+    books: [],
+    book: null,        // {book_id, title, language}
+    chapter: null,     // {number, title, total_words}
+    user: null,
+    queue: [],         // remaining lemmas
+    queueSize: 0,
+    current: null,     // current item payload from /api/session/next
+    revealed: false,
+    sessionActive: false,
+  };
 
-      const mInp = document.getElementById("setupMainModel");
-      if (document.activeElement !== mInp && state.model) mInp.value = state.model;
+  const $ = (id) => document.getElementById(id);
 
-      const dInp = document.getElementById("setupDecisionModel");
-      if (document.activeElement !== dInp && state.decision_model) dInp.value = state.decision_model;
+  // ------------------------------------------------------------- transport
+  async function apiGet(path) {
+    const res = await fetch(path, { cache: "no-store" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) throw new Error(data.error || res.statusText);
+    return data;
+  }
+  async function apiPost(path, body) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) throw new Error(data.error || res.statusText);
+    return data;
+  }
 
-      const nInp = document.getElementById("setupN");
-      if (document.activeElement !== nInp && state.batch_size) nInp.value = state.batch_size;
+  function setStatus(text, cls) {
+    const el = $("status");
+    el.textContent = text;
+    el.className = cls || "";
+  }
 
-      const kInp = document.getElementById("setupK");
-      if (document.activeElement !== kInp && state.sentences_per_word) kInp.value = state.sentences_per_word;
-    }
+  // -------------------------------------------------------------- nav/tabs
+  document.querySelectorAll("nav button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("nav button").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+      btn.classList.add("active");
+      $(`view-${btn.dataset.view}`).classList.add("active");
+      if (btn.dataset.view === "progress") loadProgress();
+    });
+  });
 
-    function renderEnrichment(state) {
-      const enr = state.enrichment || {};
-      const total = Math.max(1, enr.total || state.batch_size || 1);
-      const cur = enr.current || 0;
-      const pct = enr.active ? Math.min(100, Math.round((cur / total) * 100)) : (cur >= total && total > 0 ? 100 : 0);
-      document.getElementById("enrichStatus").textContent =
-        enr.message || (enr.active ? `Enriching ${cur}/${total}...` : "Idle");
-      document.getElementById("enrichBar").style.width = `${pct}%`;
-
-      if (enr.active && !pollTimer) {
-        pollTimer = setInterval(async () => {
-          const st = await fetchState();
-          if (!st.enrichment || !st.enrichment.active) {
-            clearInterval(pollTimer);
-            pollTimer = null;
-          }
-        }, 450);
-      } else if (!enr.active && pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-    }
-
-    function render(state) {
-      latestState = state;
-      populateSetupInputs(state);
-      renderEnrichment(state);
-
-      const isArena = state.screen === "arena";
-      document.getElementById("setupScreen").style.display = isArena ? "none" : "block";
-      document.getElementById("arenaScreen").style.display = isArena ? "block" : "none";
-
-      // Chapter readiness bar
-      const r = state.readiness || {};
-      const readyPct = Math.round((r.readiness_ratio || 0) * 100);
-      document.getElementById("readinessLabel").textContent =
-        `Chapter progress: ${readyPct}% (${r.ready_words || 0}/${r.total_words || 0} words ready)`;
-      document.getElementById("readinessFill").style.width = `${readyPct}%`;
-
-      const chObj = ((state.book && state.book.chapters) || []).find((c) => c.chapter_id === state.chapter_id);
-      document.getElementById("arenaChapterTitle").textContent =
-        chObj ? `${chObj.title} (p.${chObj.start_page}-${chObj.end_page})` : "";
-
-      [1, 2, 3].forEach((s) => {
-        document.getElementById(`pill${s}`).classList.toggle("active", state.stage === s);
-      });
-
-      if (isArena) {
-        renderStage(state);
-      }
-
-      document.getElementById("feedbackLine").textContent = state.feedback || "";
-      document.getElementById("traceLog").textContent = (state.trace || []).join("\n");
-    }
-
-    function renderStage(state) {
-      const container = document.getElementById("stageContainer");
-      container.innerHTML = "";
-
-      if (state.stage === 1) {
-        if (state.s1_batch_complete) {
-          renderBatchScoreboard(state, container);
-          return;
-        }
-
-        const w = state.active_word;
-        const found = state.s1_found_count || 0;
-        const needed = state.s1_target_count || 1;
-        const chHits = state.chapter_appearances || 0;
-
-        const banner = document.createElement("div");
-        banner.className = "target-banner";
-        banner.innerHTML = `
-          <div style="font-size:12px; color:var(--muted); text-transform:uppercase;">
-            Word ${state.s1_index + 1} of ${state.batch_count} · Chapter appearances: ${chHits}
-          </div>
-          <div class="target-word">${w ? w.lemma : ""}</div>
-          <div class="target-sub">Found ${found} / ${needed} correct translation(s)</div>
-        `;
-        container.appendChild(banner);
-
-        const grid = document.createElement("div");
-        grid.className = "tiles-grid";
-
-        (state.s1_tiles || []).forEach((label, idx) => {
-          const btn = document.createElement("button");
-          btn.className = "meaning-tile";
-          btn.textContent = label;
-          if (pendingBlink && pendingBlink.index === idx) {
-            btn.classList.add(pendingBlink.cls);
-            pendingBlink = null;
-          }
-          btn.onclick = async () => {
-            const resp = await postJson("/api/tap_meaning", { tile_index: idx });
-            if (resp && resp.tap) {
-              const out = resp.tap.outcome;
-              if (out === "correct") pendingBlink = { index: idx, cls: "blink-green" };
-              else if (out === "wrong") pendingBlink = { index: idx, cls: "blink-red" };
-            }
-            render(resp);
-          };
-          grid.appendChild(btn);
-        });
-
-        container.appendChild(grid);
-
-      } else if (state.stage === 2) {
-        const total = Math.max(1, state.s2_total || 1);
-        const cur = Math.min(total, (state.s2_index || 0) + 1);
-        const pct = Math.round(((state.s2_index || 0) / total) * 100);
-
-        const prog = document.createElement("div");
-        prog.style.marginBottom = "10px";
-        prog.innerHTML = `
-          <div style="font-size:12.5px; color:var(--muted);">Sentence Completion: ${cur} / ${total} (${pct}%)</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%;"></div></div>
-        `;
-        container.appendChild(prog);
-
-        const q = state.s2_question;
-        if (!q) {
-          container.innerHTML += `<div style="font-weight:700;">All completion sentences done!</div>`;
-          return;
-        }
-
-        const parts = (q.sentence || "").split("_____");
-        const sentBox = document.createElement("div");
-        sentBox.className = "sentence-box";
-        sentBox.appendChild(document.createTextNode(parts[0] || ""));
-
-        const blankSpan = document.createElement("span");
-        blankSpan.id = "activeBlankSlot";
-        blankSpan.className = "blank-slot";
-        blankSpan.textContent = "_____";
-        sentBox.appendChild(blankSpan);
-
-        if (parts.length > 1) {
-          sentBox.appendChild(document.createTextNode(parts.slice(1).join("_____")));
-        }
-        container.appendChild(sentBox);
-
-        const chips = document.createElement("div");
-        chips.className = "chips-wrap";
-        (state.s2_choices || []).forEach((lemma) => {
-          const b = document.createElement("button");
-          b.className = "word-chip";
-          b.textContent = lemma;
-          b.onclick = async () => {
-            blankSpan.textContent = lemma;
-            const resp = await postJson("/api/check_completion", { chosen_lemma: lemma });
-            if (resp && resp.completion) {
-              blankSpan.classList.add(resp.completion.correct ? "ok" : "bad");
-            }
-            setTimeout(() => render(resp), 360);
-          };
-          chips.appendChild(b);
-        });
-        container.appendChild(chips);
-
-      } else if (state.stage === 3) {
-        const total = Math.max(1, state.s3_total || 1);
-        const cur = Math.min(total, (state.s3_index || 0) + 1);
-        const pct = Math.round(((state.s3_index || 0) / total) * 100);
-
-        const prog = document.createElement("div");
-        prog.style.marginBottom = "10px";
-        prog.innerHTML = `
-          <div style="font-size:12.5px; color:var(--muted);">Sentence Translation: ${cur} / ${total} (${pct}%)</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%;"></div></div>
-        `;
-        container.appendChild(prog);
-
-        const item = state.s3_item;
-        if (!item) {
-          container.innerHTML += `<div style="font-weight:700;">All sentences translated!</div>`;
-          return;
-        }
-
-        const sBox = document.createElement("div");
-        sBox.className = "sentence-box";
-        sBox.textContent = item.sentence;
-        container.appendChild(sBox);
-
-        const inp = document.createElement("input");
-        inp.type = "text";
-        inp.id = "s3Input";
-        inp.placeholder = "Translate this sentence into English...";
-        inp.style.marginBottom = "10px";
-        container.appendChild(inp);
-
-        const row = document.createElement("div");
-        row.className = "row";
-
-        const checkBtn = document.createElement("button");
-        checkBtn.className = "launch col";
-        checkBtn.textContent = `Judge (${state.decision_model || "tev1:4b"})`;
-        checkBtn.onclick = async () => {
-          const resp = await postJson("/api/validate_translation", { translation: inp.value });
-          render(resp);
-        };
-
-        const nextBtn = document.createElement("button");
-        nextBtn.className = "col";
-        nextBtn.textContent = "Next Sentence →";
-        nextBtn.onclick = async () => {
-          const resp = await postJson("/api/next_s3");
-          render(resp);
-        };
-
-        row.appendChild(checkBtn);
-        row.appendChild(nextBtn);
-        container.appendChild(row);
-
-        // Reveal main LLM breakdown card ONLY when decision model marks translation invalid
-        if (state.s3_last_verdict && !state.s3_last_verdict.valid && state.s3_explanation) {
-          const card = document.createElement("div");
-          card.className = "breakdown-card";
-          card.textContent = `Main Model (${state.model}) Breakdown:\n\n${state.s3_explanation}`;
-          container.appendChild(card);
-        }
-      }
-    }
-
-    function renderBatchScoreboard(state, container) {
-      const title = document.createElement("div");
-      title.style.fontSize = "19px";
-      title.style.fontWeight = "800";
-      title.style.color = "var(--green)";
-      title.textContent = "Batch Meaning Scores";
-      container.appendChild(title);
-
-      const tbl = document.createElement("table");
-      tbl.className = "score-table";
-      tbl.innerHTML = `<thead><tr><th>Word</th><th>Hits</th><th>Misses</th></tr></thead><tbody></tbody>`;
-      const tbody = tbl.querySelector("tbody");
-
-      (state.s1_scoreboard || []).forEach((row) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td><strong>${row.lemma}</strong></td><td>${row.hits}</td><td>${row.misses}</td>`;
-        tbody.appendChild(tr);
-      });
-      container.appendChild(tbl);
-
-      const ask = document.createElement("div");
-      ask.style.fontWeight = "700";
-      ask.style.marginBottom = "10px";
-      ask.textContent = "Do you want to move to the next session?";
-      container.appendChild(ask);
-
-      const row = document.createElement("div");
-      row.className = "row";
-
-      const nextStageBtn = document.createElement("button");
-      nextStageBtn.className = "launch col";
-      nextStageBtn.textContent = "Stage 2: Completion";
-      nextStageBtn.onclick = async () => {
-        const resp = await postJson("/api/stage", { stage: 2 });
-        render(resp);
-      };
-
-      const nextBatchBtn = document.createElement("button");
-      nextBatchBtn.className = "col";
-      nextBatchBtn.textContent = "Next Word Batch";
-      nextBatchBtn.onclick = () => launchSession();
-
-      const setupBtn = document.createElement("button");
-      setupBtn.className = "col";
-      setupBtn.textContent = "Back to Setup";
-      setupBtn.onclick = () => switchScreen("setup");
-
-      row.appendChild(nextStageBtn);
-      row.appendChild(nextBatchBtn);
-      row.appendChild(setupBtn);
-      container.appendChild(row);
-    }
-
-    function gatherConfig() {
-      return {
-        book_id: document.getElementById("setupBook").value,
-        chapter_id: document.getElementById("setupChapter").value,
-        model: document.getElementById("setupMainModel").value,
-        decision_model: document.getElementById("setupDecisionModel").value,
-        batch_size: parseInt(document.getElementById("setupN").value || "10", 10),
-        sentences_per_word: parseInt(document.getElementById("setupK").value || "2", 10),
-      };
-    }
-
-    async function syncSetupToServer() {
-      const resp = await postJson("/api/configure", gatherConfig());
-      render(resp);
-    }
-
-    async function launchSession() {
-      const resp = await postJson("/api/start_batch", gatherConfig());
-      render(resp);
-    }
-
-    async function switchScreen(scr) {
-      const resp = await postJson("/api/screen", { screen: scr });
-      render(resp);
-    }
-
-    async function setStage(st) {
-      const resp = await postJson("/api/stage", { stage: st });
-      render(resp);
-    }
-
-    function openRedFlag() {
-      if (!latestState || !latestState.active_word) {
-        alert("No active word to inspect.");
+  // --------------------------------------------------------- setup: books
+  async function loadBooks() {
+    try {
+      const data = await apiGet("/api/books");
+      state.books = data.books || [];
+      const sel = $("s-book");
+      sel.innerHTML = "";
+      if (state.books.length === 0) {
+        sel.innerHTML = '<option value="">No books in data/books/</option>';
+        $("s-start").disabled = true;
         return;
       }
-      document.getElementById("rfEditor").value = JSON.stringify(latestState.active_word, null, 2);
-      document.getElementById("redFlagModal").style.display = "flex";
+      state.books.forEach((id) => {
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = id;
+        sel.appendChild(opt);
+      });
+      $("s-start").disabled = false;
+      setStatus("online", "online");
+    } catch (err) {
+      setStatus("offline", "offline");
+      $("s-feedback").textContent = `Bridge unreachable: ${err.message}`;
+    }
+  }
+
+  async function startSession() {
+    const bookId = $("s-book").value;
+    const chapter = parseInt($("s-chapter").value, 10) || 1;
+    const limit = parseInt($("s-limit").value, 10) || 20;
+    if (!bookId) return;
+
+    try {
+      $("s-feedback").textContent = "Loading…";
+      const sel = await apiPost("/api/select", { book_id: bookId, chapter_number: chapter });
+      state.book = sel.state.book;
+      state.chapter = sel.state.chapter;
+      state.user = sel.state.user;
+
+      const sess = await apiPost("/api/session/start", { limit });
+      state.queue = sess.queue || [];
+      state.queueSize = state.queue.length;
+      state.sessionActive = true;
+      $("s-feedback").textContent =
+        `Loaded ${state.book.title} — chapter ${state.chapter.number}. Queue: ${state.queueSize}.`;
+
+      // jump to practice tab
+      document.querySelector('nav button[data-view="practice"]').click();
+      renderPracticeShell();
+      await nextWord();
+    } catch (err) {
+      $("s-feedback").textContent = `Error: ${err.message}`;
+    }
+  }
+
+  // ------------------------------------------------------ practice: render
+  function renderPracticeShell() {
+    $("practice-empty").style.display = "none";
+    $("practice-done").style.display = "none";
+    $("practice-card").style.display = "block";
+  }
+
+  function renderItem(item) {
+    state.current = item;
+    state.revealed = false;
+
+    $("p-word").textContent = item.lemma;
+    const wk = item.knowledge || {};
+    const status = wk.known_status || "new";
+    const seen = wk.attempts || 0;
+    const acc = ((wk.accuracy || 0) * 100).toFixed(0);
+    $("p-meta").innerHTML =
+      `<span class="pill ${status}">${status}</span> ` +
+      `<span class="pill">${seen} attempts</span> ` +
+      `<span class="pill">${acc}%</span>`;
+
+    const remaining = state.queue.length;
+    const done = state.queueSize - remaining - 1;
+    $("p-bar").style.width =
+      state.queueSize ? `${((done + 1) / state.queueSize) * 100}%` : "0%";
+
+    $("p-reveal").classList.add("hidden");
+    $("p-reveal").innerHTML = "";
+    $("p-assess").style.display = "none";
+    $("p-reveal-btn").disabled = false;
+    $("p-reveal-btn").style.display = "block";
+    $("p-feedback").textContent = "";
+    $("p-enrich").disabled = !!item.is_enriched;
+    $("p-enrich").textContent = item.is_enriched ? "Already enriched" : "Enrich with AI";
+  }
+
+  function buildRevealHtml(item) {
+    const entry = item.entry || {};
+    const entries = entry.entries || [];
+    const linguistics = entry.linguistics || { explanation: "", edge_cases: [] };
+    const examples = item.examples || [];
+
+    let html = "";
+
+    if (entries.length === 0) {
+      html += `<div class="explanation" style="color:var(--muted)">
+        No enriched data yet. Tap <b>Enrich with AI</b> below to generate
+        translations and a linguistic explanation.
+      </div>`;
+    } else {
+      // translations from every form entry, flattened, deduped
+      const seen = new Set();
+      const trs = [];
+      entries.forEach((e) =>
+        (e.translations || []).forEach((t) => {
+          const k = t.toLowerCase();
+          if (!seen.has(k)) { seen.add(k); trs.push(t); }
+        })
+      );
+      if (trs.length) {
+        html += `<div class="translations">${
+          trs.map((t) => `<span>${escapeHtml(t)}</span>`).join("")
+        }</div>`;
+      }
+
+      // forms + relations
+      html += entries
+        .map(
+          (e) =>
+            `<div class="form-row">
+              <div><b>${escapeHtml(e.form)}</b></div>
+              <div class="relation">${escapeHtml(e.relation)}</div>
+            </div>`
+        )
+        .join("");
+
+      // explanation
+      if (linguistics.explanation) {
+        html += `<div class="explanation">${escapeHtml(linguistics.explanation)}</div>`;
+      }
+
+      // edge cases
+      const edges = linguistics.edge_cases || [];
+      if (edges.length) {
+        html += `<ul class="edge-cases">${
+          edges.map((e) => `<li>${escapeHtml(e)}</li>`).join("")
+        }</ul>`;
+      }
+
+      // semantic keywords
+      const kws = entry.semantic_keywords || [];
+      if (kws.length) {
+        html += `<div class="translations" style="margin-top:12px">${
+          kws.map((k) => `<span>#${escapeHtml(k)}</span>`).join("")
+        }</div>`;
+      }
     }
 
-    function closeRedFlag() {
-      document.getElementById("redFlagModal").style.display = "none";
+    // personalized examples
+    if (examples.length) {
+      html += `<h2 style="margin-top:18px">Examples</h2>`;
+      html += examples
+        .map(
+          (ex) =>
+            `<div class="example">
+              ${escapeHtml(ex.sentence)}
+              <div class="tr">${escapeHtml(ex.translation)}</div>
+            </div>`
+        )
+        .join("");
     }
 
-    async function saveRedFlag() {
-      let parsed;
+    return html;
+  }
+
+  async function nextWord() {
+    if (state.queue.length === 0) {
+      // ask the server once more — it may have more in a different chapter,
+      // or it will return null to signal "done".
       try {
-        parsed = JSON.parse(document.getElementById("rfEditor").value);
-      } catch (e) {
-        alert("Invalid JSON: " + e.message);
+        const res = await apiGet("/api/session/next");
+        if (!res.item) {
+          showDone();
+          return;
+        }
+        renderPracticeShell();
+        renderItem(res.item);
+        return;
+      } catch (err) {
+        showDone();
         return;
       }
-      closeRedFlag();
-      const resp = await postJson("/api/red_flag", { word: parsed });
-      render(resp);
     }
 
-    fetchState();
-  </script>
+    try {
+      const res = await apiGet("/api/session/next");
+      if (!res.item) { showDone(); return; }
+      // sync local queue count if server pushed something
+      renderItem(res.item);
+    } catch (err) {
+      $("p-feedback").textContent = `Error: ${err.message}`;
+    }
+  }
+
+  function showDone() {
+    state.sessionActive = false;
+    state.current = null;
+    $("practice-card").style.display = "none";
+    $("practice-empty").style.display = "none";
+    $("practice-done").style.display = "block";
+    // refresh progress in background
+    loadProgress();
+  }
+
+  // --------------------------------------------------- practice: actions
+  async function reveal() {
+    if (!state.current) return;
+    state.revealed = true;
+    $("p-reveal").innerHTML = buildRevealHtml(state.current);
+    $("p-reveal").classList.remove("hidden");
+    $("p-assess").style.display = "flex";
+    $("p-reveal-btn").style.display = "none";
+  }
+
+  async function answer(correct) {
+    if (!state.current) return;
+    try {
+      const res = await apiPost("/api/session/answer", { correct });
+      const wk = res.knowledge || {};
+      $("p-feedback").textContent =
+        `${correct ? "✓" : "✗"} ${res.lemma} — accuracy ${Math.round((wk.accuracy || 0) * 100)}%, status ${wk.known_status}`;
+      state.queue.shift();
+      setTimeout(nextWord, 450);
+    } catch (err) {
+      $("p-feedback").textContent = `Error: ${err.message}`;
+    }
+  }
+
+  async function skipCurrent() {
+    if (!state.current) return;
+    try {
+      await apiPost(`/api/word/${encodeURIComponent(state.current.lemma)}/skip`, {});
+      state.queue.shift();
+      await nextWord();
+    } catch (err) {
+      $("p-feedback").textContent = `Error: ${err.message}`;
+    }
+  }
+
+  async function enrichCurrent() {
+    if (!state.current) return;
+    $("p-enrich").disabled = true;
+    $("p-enrich").textContent = "Enriching…";
+    try {
+      const res = await apiPost(
+        `/api/word/${encodeURIComponent(state.current.lemma)}/enrich`,
+        {}
+      );
+      if (res.enriched) {
+        // re-fetch full word payload
+        const detail = await apiGet(`/api/word/${encodeURIComponent(state.current.lemma)}`);
+        if (detail.word) {
+          state.current = detail.word;
+          if (state.revealed) {
+            $("p-reveal").innerHTML = buildRevealHtml(state.current);
+          }
+        }
+        $("p-enrich").textContent = "Enriched ✓";
+      } else {
+        $("p-enrich").textContent = "Enrich failed — retry";
+        $("p-enrich").disabled = false;
+      }
+    } catch (err) {
+      $("p-enrich").textContent = "Enrich failed — retry";
+      $("p-enrich").disabled = false;
+    }
+  }
+
+  // -------------------------------------------------------------- progress
+  async function loadProgress() {
+    try {
+      const data = await apiGet("/api/progress");
+      const chapters = data.chapters || [];
+      const list = $("progress-list");
+      if (chapters.length === 0) {
+        $("progress-empty").style.display = "block";
+        list.innerHTML = "";
+        return;
+      }
+      $("progress-empty").style.display = "none";
+
+      list.innerHTML = chapters
+        .map((ch) => {
+          const r = ch.readiness || {};
+          const ratio = (r.readiness_ratio ?? 0) * 100;
+          const cls = ratio >= 80 ? "ready" : ratio >= 40 ? "medium" : "low";
+          const score = ch.score ? (ch.score.score ?? 0) : 0;
+          return `
+            <div class="card chapter-row">
+              <div class="chapter-head">
+                <span class="title">Ch. ${ch.number}${ch.title ? " — " + escapeHtml(ch.title) : ""}</span>
+                <span class="score">score ${(score * 100).toFixed(0)}%</span>
+              </div>
+              <div class="readiness-bar ${cls}">
+                <span style="width:${ratio.toFixed(1)}%"></span>
+              </div>
+              <div class="chapter-meta">
+                ${r.ready_words ?? 0} known · ${r.learning_words ?? 0} learning · ${r.new_words ?? 0} new
+                · ${ratio.toFixed(0)}% ready
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    } catch (err) {
+      $("progress-empty").style.display = "block";
+      $("progress-empty").textContent = `Progress unavailable: ${err.message}`;
+    }
+  }
+
+  // ------------------------------------------------------------- helpers
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // ---------------------------------------------------------- wire-up
+  $("s-start").addEventListener("click", startSession);
+  $("p-reveal-btn").addEventListener("click", reveal);
+  $("p-good").addEventListener("click", () => answer(true));
+  $("p-bad").addEventListener("click", () => answer(false));
+  $("p-skip").addEventListener("click", skipCurrent);
+  $("p-enrich").addEventListener("click", enrichCurrent);
+  $("p-again").addEventListener("click", async () => {
+    // start a fresh queue with the same book/chapter
+    try {
+      const limit = parseInt($("s-limit").value, 10) || 20;
+      const sess = await apiPost("/api/session/start", { limit });
+      state.queue = sess.queue || [];
+      state.queueSize = state.queue.length;
+      state.sessionActive = true;
+      $("practice-done").style.display = "none";
+      renderPracticeShell();
+      await nextWord();
+    } catch (err) {
+      $("p-feedback").textContent = `Error: ${err.message}`;
+    }
+  });
+
+  // boot
+  loadBooks();
+})();
+</script>
 </body>
 </html>

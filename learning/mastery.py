@@ -59,12 +59,77 @@ def record_attempt(progress: UserProgress, lemma: str, correct: bool) -> WordKno
     return wk
 
 
-def mark_word_skipped(progress: UserProgress, lemma: str) -> WordKnowledge:
-    wk = progress.word_knowledge.get(lemma) or WordKnowledge(lemma=lemma)
-    wk.known_status = "skipped"
-    progress.word_knowledge[lemma] = wk
+# ---------------------------------------------------------------------------
+# Manual status overrides (used by UI buttons and the phone bridge)
+#
+# All helpers are pure mutations on `progress` — the CALLER is responsible
+# for calling save_user_progress(progress) afterwards. This matches the
+# pattern of record_attempt() and keeps persistence a single concern.
+# ---------------------------------------------------------------------------
+
+def _get_or_create(progress: UserProgress, lemma: str) -> WordKnowledge:
+    """Fetch the WordKnowledge for `lemma`, creating a fresh one if absent."""
+    wk = progress.word_knowledge.get(lemma)
+    if wk is None:
+        wk = WordKnowledge(lemma=lemma)
+        progress.word_knowledge[lemma] = wk
     return wk
 
+
+def mark_word_known(progress: UserProgress, lemma: str) -> WordKnowledge:
+    """Force-mark a word as mastered — the user says 'I know this'.
+
+    Historical attempts/accuracy are preserved so that unlater `mark_word_new`
+    can restore a sensible state. Status becomes 'mastered', which excludes
+    the word from future queues (see scheduler._EXCLUDED_STATUSES).
+    """
+    wk = _get_or_create(progress, lemma)
+    wk.known_status = "mastered"
+    return wk
+
+
+def mark_word_skipped(progress: UserProgress, lemma: str) -> WordKnowledge:
+    """Force-mark a word as skipped — like 'known', but semantically "ignored"."""
+    wk = _get_or_create(progress, lemma)
+    wk.known_status = "skipped"
+    return wk
+
+
+def mark_word_new(progress: UserProgress, lemma: str) -> WordKnowledge:
+    """Reset a word to 'new' — the 'forget this word' action.
+
+    Also wipes the accuracy counter so the scheduler treats it as unseen
+    again. If you prefer to preserve history, drop the two following lines.
+    """
+    wk = _get_or_create(progress, lemma)
+    wk.known_status = "new"
+    wk.attempts = 0
+    wk.correct = 0
+    wk.accuracy = 0.0
+    return wk
+
+
+def mark_word_learning(progress: UserProgress, lemma: str) -> WordKnowledge:
+    """Force-mark a word as 'learning' (in the queue, not yet mastered)."""
+    wk = _get_or_create(progress, lemma)
+    wk.known_status = "learning"
+    return wk
+
+
+def set_word_status(
+    progress: UserProgress,
+    lemma: str,
+    status: str,
+) -> WordKnowledge:
+    """Generic override — useful for admin / bulk tooling / CLI scripts."""
+    valid = {"new", "learning", "mastered", "skipped"}
+    if status not in valid:
+        raise ValueError(
+            f"Invalid status {status!r}; expected one of {sorted(valid)}"
+        )
+    wk = _get_or_create(progress, lemma)
+    wk.known_status = status
+    return wk
 
 # ---------------------------------------------------------------------------
 # Chapter-level views
@@ -166,3 +231,48 @@ def refresh_chapter_scores(book: BookIndex, progress: UserProgress) -> None:
         progress.chapter_scores[chapter.chapter_id] = compute_chapter_score(
             chapter, book, progress
         )
+
+# ---------------------------------------------------------------------------
+# Back-compat wrappers around the old mastery API
+# ---------------------------------------------------------------------------
+
+def chapter_is_ready(
+    chapter: ChapterInfo,
+    book: BookIndex,
+    progress: UserProgress,
+    target: float = CHAPTER_READINESS_TARGET,
+) -> bool:
+    """Boolean shortcut for chapter_readiness(...)['readiness_ratio'] >= target."""
+    return chapter_readiness(chapter, book, progress)["readiness_ratio"] >= target
+
+
+def build_session_queue(
+    book: BookIndex,
+    progress: UserProgress,
+    *,
+    chapter_number: int | None = None,
+    limit: int = 20,
+) -> list[str]:
+    """Forward to learning.scheduler.build_queue (the canonical implementation)."""
+    from learning.scheduler import build_queue        # local import: avoid cycle
+    return build_queue(book, progress, chapter_number=chapter_number, limit=limit)
+
+
+def build_session_plan(
+    book: BookIndex,
+    progress: UserProgress,
+    *,
+    chapter_number: int | None = None,
+    limit: int = 20,
+) -> dict:
+    """Older callers may expect a dict with a queue and a count.
+
+    If a caller expects a *bare list*, change `.get('queue')` to a plain return —
+    the wrapper below returns both so either shape works:
+        build_session_plan(...)['queue']   → list[str]
+        build_session_plan(...)['count']   → int
+    """
+    queue = build_session_queue(
+        book, progress, chapter_number=chapter_number, limit=limit
+    )
+    return {"queue": queue, "count": len(queue)}

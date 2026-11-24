@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Iterable
 
 from config import DATA_DIR
-from models.schemas import BookIndex, ChapterInfo, VocabularyEntry
+from models.schemas import BookIndex, ChapterInfo, VocabularyEntry, Occurrence
 
 BOOKS_DIR = DATA_DIR / "books"
 GRANTED_DIR = DATA_DIR / "granted"
@@ -148,6 +148,10 @@ def build_book_index(
             entry.occurrences += count
             if entry.first_chapter == 0:
                 entry.first_chapter = filtered.number
+            if len(entry.sentences) < 5:
+                entry.sentences.append(
+                    Occurrence(chapter_id=filtered.chapter_id, page=filtered.start_page)
+                )
 
     return book
 
